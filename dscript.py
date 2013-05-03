@@ -1,8 +1,8 @@
 #!/usr/bin/python
 """
-    Version:	Alpha 0.3 - Modem Script - CGI Functionality
+    Version:	0.1.1 - New Concept using webpy and ajax instead of plain old simple cgi 
     Author: 	Memleak13
-    Date: 	27.03.13
+    Date: 	03.05.13
 
     BUG: rxpwr = psid -> needs to be corrected, wrong field is extracted!
 	
