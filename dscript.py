@@ -2,7 +2,7 @@
 """
     Version:	0.1.1 - New Concept using webpy and ajax instead of plain old cgi 
     Author:		Memleak13
-    Date:		03.05.13
+    Date:		03.05.13 - 23:00
 """
 
 import re
@@ -38,7 +38,7 @@ class MacDomain(object):
 	def __init__(self, name):
 		self.name = name
 		self.cmtotal = '' # total cm in macdomain
-		self.cmlist = []  # a list of all cm objects in this mac domain
+		self.modem = Modem()
     
 	def extractData(self):
 		#Step 2.1:  #Reading and filtering the cmts output to include only modems
@@ -55,37 +55,64 @@ class MacDomain(object):
 		print ('Total modems on card: %d' % self.cmtotal)
 	
 		#Step 2.2 : - Line by line the cleanedlist is splitted into its values
-		#           - Modem is then created with these values	
+		#           - Modem is then created with these inital values	
 	
 		cmdatafromcmts = []
 		for line in cleanedlist:
 			del cmdatafromcmts[:]
 			cmdatafromcmts = line.split()
-			modem = Modem(cmdatafromcmts[0].strip(),cmdatafromcmts[1].strip(),cmdatafromcmts[2].strip(),cmdatafromcmts[3].strip(),cmdatafromcmts[5].strip())
+			
+			self.modem.mac = cmdatafromcmts[0].strip()
+			self.modem.ip = cmdatafromcmts[1].strip()
+			self.modem.iface = cmdatafromcmts[2].strip()
+			self.modem.state = cmdatafromcmts[3].strip()
+			self.modem.rxpwr = cmdatafromcmts[5].strip()
+			
 			print "Modem Mac: " + cmdatafromcmts[0]
 
 			#Step 2.3 : - Telneting to cmts, running verbose command, storing output in telnetoutput
 			#           - Filtering verbose values and adding them to created modem object   
 			ubr01shr.getCMverbose(cmdatafromcmts[0])
-			modem.setUSData()
+			self.modem.setUSData()
 		
 			#Step 2.4 : - Gathering CM DS Data by SNMP and storing them in created modem object
-			modem.setDSData()
+			self.modem.setDSData()
 
-			#Step 2.5: adding the CM to the modemlist
-			self.cmlist.append(modem)
+			#Step 2.5: writing <tr> with all the modem values into ./result.html, the returned file by AJAX
+			if 'DOC3.0' in self.modem.macversion:
+				self.writeD3data()
+			else:
+				self.writeD2data()
+	
+	def writeD3data(self):
+		RESULT.write('<tr>')
+		RESULT.write('<td>' + self.modem.mac + '</td>')
+		RESULT.write('<td>' + self.modem.ip + '</td>')
+		RESULT.write('<td>' + self.modem.iface + '</td>')
+		RESULT.write('<td>' + self.modem.state + '</td>')
+		RESULT.write('<td>' + self.modem.rxpwr + '</td>')
+		RESULT.write('</tr>')
+		
+	def writeD2data(self):
+		RESULT.write('<tr>')
+		RESULT.write('<td>' + self.modem.mac + '</td>')
+		RESULT.write('<td>' + self.modem.ip + '</td>')
+		RESULT.write('<td>' + self.modem.iface + '</td>')
+		RESULT.write('<td>' + self.modem.state + '</td>')
+		RESULT.write('<td>' + self.modem.rxpwr + '</td>')
+		RESULT.write('</tr>')
 
 
 class Modem(object):
 	snmpcommunity = 'web4suhr'
-	def __init__(self, mac, ip, iface, state, rxpwr):
+	def __init__(self):
 		#To keep things simple, I created list for all attributes
 		#but the initial ones. Even if they only take one attribute
-		self.mac = mac
-		self.ip = ip
-		self.iface = iface
-		self.state = state
-		self.rxpwr = rxpwr
+		self.mac = ''
+		self.ip = ''
+		self.iface = ''
+		self.state = ''
+		self.rxpwr = ''
 		self.macversion = []
 		self.upsnr = []
 		self.receivedpwr = []
@@ -276,29 +303,63 @@ class TelnetAccess(object):
 		self.tn.close()
 
 
+
+def createHTMLHeader():
+	RESULT.write('<!DOCTYPE HTML>')
+	RESULT.write('<html>')
+	RESULT.write('<head>')
+	RESULT.write('<meta charset="utf-8">')
+	RESULT.write('</head>')
+	RESULT.write('<body>')
+	RESULT.write('<table border=1>')
+	
+def createHTMLFooter():
+	RESULT.write('</table>')
+	RESULT.write('</body>')
+	RESULT.write('</html>')
+
+
 #Main
 
 #Global Parameters
 IOS_UID = 'dscript'
 IOS_PW = 'hf4ev671'
 ONLINE = 0  #to compare performance. This counter counts every online modem, while running through the script
+RESULT = open('./result.html', 'w')
 
-# Step 1: 	Create CMTS Object, telnet cmts and login, issue command, receive cm list
-#			Just to test this script the mac domain is entered manually into this script
+"""
+Step 1: Create CMTS Object, telnet cmts and login, issue command, receive cm list
+		Just to test this script the mac domain is entered manually into this script
+"""
 
-# 1.1 - Script Processing
+# 1.1 - Creating html header 
+createHTMLHeader()
+
+# 1.2 - Script Processing
 ubr01shr = Cmts('10.10.10.50', 'ubr01shr')
 ubr01shr.createMacDomain('5/0/4') #This value in future will be passed in
 ubr01shr.getCMs()
 
-# Step 2 (2.1 - 2.5):	- Extract Data from cm list (telnet output from cmts)
-#						- Create Modem Object
-#						- Populate CM values from CMTS and CM (SNMP)
-#						- Add all CMs to macdomain.clist	 
+"""
+Step 2 (2.1 - 2.5):	- Extract Data from cm list (telnet output from cmts)
+					- Create Modem Object
+					- Populate CM values from CMTS and CM (SNMP)
+					- Add all CMs to macdomain.clist	 
+"""
 
 ubr01shr.macdomains.extractData()	  	
 print ('Total modems on card: %d' % ubr01shr.macdomains.cmtotal)
+print 'ONLINE %d' % ONLINE
 
+"""
+#Step 3 - Creating HTML footer
+"""
+
+createHTMLFooter()
+
+#Cleaning up
+RESULT.close()
+del ubr01shr
 
 """"
 # Keeping this for copy past purposes for the time being
@@ -410,7 +471,7 @@ print "</body>"
 print "</html>"
 
 """
-
+""""
 for cm in ubr01shr.macdomains.cmlist:
 	print 'mac:                         ' + cm.mac
 	print 'ip:                          ' + cm.ip
@@ -456,10 +517,4 @@ for cm in ubr01shr.macdomains.cmlist:
 	for value in cm.docsIfCmStatusT4Timeouts:
 		print 'docsIfCmStatusT4Timeouts:    ' + value
 	print "**********************************\n\n"
-
-print 'ONLINE %d' % ONLINE
-
-#Closing up
-del ubr01shr
-
-
+"""
