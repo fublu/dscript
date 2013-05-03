@@ -3,50 +3,44 @@
     Version:	0.1.1 - New Concept using webpy and ajax instead of plain old cgi 
     Author:		Memleak13
     Date:		03.05.13
-
-    BUG: rxpwr = psid -> needs to be corrected, wrong field is extracted!
-	
 """
 
-##import cgi,cgitb
 import re
 import sys
 import time
 import telnetlib
 from pysnmp.entity.rfc3413.oneliner import cmdgen
 
-##cgitb.enable()
-
 #Class Definitions
 class Cmts(object):
-    def __init__(self, ip, name):
+	def __init__(self, ip, name):
 		self.ip = ip
 		self.name = name
 		self.macdomains = '' #a list of all macdomain objects, as there is only one right now, it is a string
 		self.tn = TelnetAccess(self.ip, IOS_UID, IOS_PW) # creates a telnet obj and logs into cmts stays logged in
     
-    def createMacDomain(self, iface):
+	def createMacDomain(self, iface):
 		self.macdomains  = MacDomain(iface)
 
-    def getCMs(self):
+	def getCMs(self):
 		self.tn.runCommand('show cable modem cable ' + ubr01shr.macdomains.name)
 
-    def getCMverbose(self, cmmac):
+	def getCMverbose(self, cmmac):
 		self.tn.runCommand('show cable modem ' + cmmac + ' verbose')
 		#print ('show cable modem ' + cmmac + ' verbose')
 
-    def __del__(self):
+	def __del__(self):
 		self.tn.closeTN() 	# close telnet connection
 		del self.tn 		# delete object
 
 
 class MacDomain(object):
-    def __init__(self, name):
+	def __init__(self, name):
 		self.name = name
 		self.cmtotal = '' # total cm in macdomain
 		self.cmlist = []  # a list of all cm objects in this mac domain
     
-	def extractData(self):	
+	def extractData(self):
 		#Step 2.1:  #Reading and filtering the cmts output to include only modems
 		#by deleteing first 4 and last 2 lines, file is stored in cleanedlist
 		fin = open  ('./telnetoutput', 'r') #('./test','r') #in production change to telnetoutput
@@ -83,8 +77,8 @@ class MacDomain(object):
 
 
 class Modem(object):
-    snmpcommunity = 'web4suhr'
-    def __init__(self, mac, ip, iface, state, rxpwr):
+	snmpcommunity = 'web4suhr'
+	def __init__(self, mac, ip, iface, state, rxpwr):
 		#To keep things simple, I created list for all attributes
 		#but the initial ones. Even if they only take one attribute
 		self.mac = mac
@@ -175,7 +169,7 @@ class Modem(object):
 
 	#Setting data gathered from CM by SNMP
 	#TEST: The values needs to be checked as dictionaries are generally unsorted!
-    def setDSData(self):
+	def setDSData(self):
 		if 'online' in self.state:
 			#ONLINE counts the amount of online modems snmp requests are sent to 
 			#this will then be displayed as soon as script finishes
@@ -201,7 +195,7 @@ class Modem(object):
 				if 'docsIfCmStatusT4Timeouts' in mib:
 					self.docsIfCmStatusT4Timeouts.append(snmpvalue)
 	
-    def getsnmp(self):
+	def getsnmp(self):
 		snmpvalue = {}  #dictionary which will be returned
 		cmdGen = cmdgen.CommandGenerator()
 		errorIndication, errorStatus, errorIndex, varBindTable = cmdGen.nextCmd(
@@ -289,27 +283,12 @@ IOS_UID = 'dscript'
 IOS_PW = 'hf4ev671'
 ONLINE = 0  #to compare performance. This counter counts every online modem, while running through the script
 
-# Step 1: 	Receive US value from drop down menu using CGI, Create CMTS Object, telnet cmts and login, issue command
-# 			receive cm list
+# Step 1: 	Create CMTS Object, telnet cmts and login, issue command, receive cm list
+#			Just to test this script the mac domain is entered manually into this script
 
-# 1.1 - CGI Processing
-form = cgi.FieldStorage() # instantiate only once!
-selected  =  form.getfirst('us', 'empty')
-# Avoid script injection escaping the user input
-selected = cgi.escape(selected)
-
-print "Content-type:text/html\r\n\r\n"
-print "<!DOCTYPE HTML>"
-print "<html>"
-print "<head>"
-print selected
-print "</head>"
-print "<body>"
-
-
-# 1.2 - Script Processing
+# 1.1 - Script Processing
 ubr01shr = Cmts('10.10.10.50', 'ubr01shr')
-ubr01shr.createMacDomain(selected)
+ubr01shr.createMacDomain('5/0/4') #This value in future will be passed in
 ubr01shr.getCMs()
 
 # Step 2 (2.1 - 2.5):	- Extract Data from cm list (telnet output from cmts)
@@ -320,6 +299,9 @@ ubr01shr.getCMs()
 ubr01shr.macdomains.extractData()	  	
 print ('Total modems on card: %d' % ubr01shr.macdomains.cmtotal)
 
+
+""""
+# Keeping this for copy past purposes for the time being
 # Step 3 - Creating Output
 #print "Content-type:text/html\r\n\r\n"
 #print "<!DOCTYPE HTML>"
@@ -427,9 +409,8 @@ print "</table>"
 print "</body>"
 print "</html>"
 
-
 """
-#Debug
+
 for cm in ubr01shr.macdomains.cmlist:
 	print 'mac:                         ' + cm.mac
 	print 'ip:                          ' + cm.ip
@@ -438,45 +419,44 @@ for cm in ubr01shr.macdomains.cmlist:
 	print 'rxpwr:                       ' + cm.rxpwr
 
 	for value in cm.macversion:
-                print 'macversion:                  ' + value
-        for value in cm.upsnr:
-                print 'upsnr:                       ' + value
-        for value in cm.receivedpwr:
-                print 'receivedpwr:                 ' + value
-        for value in cm.reportedtransmitpwr:
-                print 'reportedtransmitpwr:         ' + value
-        for value in cm.dspwr:
-                print 'dspwr:                       ' + value
-        for value in cm.toff:
-                print 'toff:                        ' + value
-        for value in cm.uncorrectables:
-                print 'uncorrectables:              ' + value
-        for value in cm.flaps:
-                print 'flaps:                       ' + value
-        for value in cm.errors:
-                print 'errors:                      ' + value
-        for value in cm.reason:
-                print 'reason:                      ' + value
+		print 'macversion:                  ' + value
+	for value in cm.upsnr:
+		print 'upsnr:                       ' + value
+	for value in cm.receivedpwr:
+		print 'receivedpwr:                 ' + value
+	for value in cm.reportedtransmitpwr:
+		print 'reportedtransmitpwr:         ' + value
+	for value in cm.dspwr:
+		print 'dspwr:                       ' + value
+	for value in cm.toff:
+		print 'toff:                        ' + value
+	for value in cm.uncorrectables:
+		print 'uncorrectables:              ' + value
+	for value in cm.flaps:
+		print 'flaps:                       ' + value
+	for value in cm.errors:
+		print 'errors:                      ' + value
+	for value in cm.reason:
+		print 'reason:                      ' + value
 	
 	for value in cm.docsIfDownChannelPower:
 		print 'docsIfDownChannelPower:      ' + value
-        for value in cm.docsIfSigQSignalNoise:
-                print 'docsIfSigQSignalNoise:       ' + value
-        for value in cm.docsIfSigQUncorrectables:
-                print 'docsIfSigQUncorrectables:    ' + value
-        for value in cm.docsIfSigQMicroreflections:
-                print 'docsIfSigQMicroreflections:  ' + value
-        for value in cm.docsIfCmStatusTxPower:
-                print 'docsIfCmStatusTxPower:       ' + value        
+	for value in cm.docsIfSigQSignalNoise:
+		print 'docsIfSigQSignalNoise:       ' + value
+	for value in cm.docsIfSigQUncorrectables:
+		print 'docsIfSigQUncorrectables:    ' + value
+	for value in cm.docsIfSigQMicroreflections:
+		print 'docsIfSigQMicroreflections:  ' + value
+	for value in cm.docsIfCmStatusTxPower:
+		print 'docsIfCmStatusTxPower:       ' + value        
 	for value in cm.docsIfCmStatusInvalidUcds:
-                print 'docsIfCmStatusInvalidUcds:   ' + value
-        for value in cm.docsIfCmStatusT3Timeouts:
-                print 'docsIfCmStatusT3Timeouts:    ' + value
-        for value in cm.docsIfCmStatusT4Timeouts:
-                print 'docsIfCmStatusT4Timeouts:    ' + value
+		print 'docsIfCmStatusInvalidUcds:   ' + value
+	for value in cm.docsIfCmStatusT3Timeouts:
+		print 'docsIfCmStatusT3Timeouts:    ' + value
+	for value in cm.docsIfCmStatusT4Timeouts:
+		print 'docsIfCmStatusT4Timeouts:    ' + value
 	print "**********************************\n\n"
 
-"""
 print 'ONLINE %d' % ONLINE
 
 #Closing up
