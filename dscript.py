@@ -2,7 +2,7 @@
 """
     Version:	0.1.1 - New Concept using webpy and ajax instead of plain old cgi 
     Author:		Memleak13
-    Date:		04.05.13 - 14:00
+    Date:		04.05.13 - 21:00
 """
 
 import re
@@ -407,7 +407,7 @@ class TelnetAccess(object):
 		#self.tn.expect(TelnetAccess.regexlist)
 		self.tn.write(command + "\n")
 		# !DEBUG: ISSUE 5.1 - Setting Timeout from 0.3 to 2 s, giving the app enought time to write the commands output
-		time.sleep(1) 
+		time.sleep(0.75) 
 		output = self.tn.read_very_eager()
 		self.telnetoutput.write(output)
 
@@ -498,7 +498,7 @@ createTableHeader()
 
 # 1.2 - Script Processing
 ubr01shr = Cmts('10.10.10.50', 'ubr01shr')
-ubr01shr.createMacDomain('5/0/4') #This value in future will be passed in
+ubr01shr.createMacDomain('5/0/4') # !Setting Macdomain
 ubr01shr.getCMs()
 
 """
