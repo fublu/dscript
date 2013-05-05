@@ -2,7 +2,7 @@
 """
     Version:	0.1.1 - New Concept using webpy and ajax instead of plain old cgi 
     Author:		Memleak13
-    Date:		03.05.13 - 23:00
+    Date:		04.05.13 - 14:00
 """
 
 import re
@@ -12,6 +12,7 @@ import telnetlib
 from pysnmp.entity.rfc3413.oneliner import cmdgen
 
 #Class Definitions
+
 class Cmts(object):
 	def __init__(self, ip, name):
 		self.ip = ip
@@ -38,8 +39,7 @@ class MacDomain(object):
 	def __init__(self, name):
 		self.name = name
 		self.cmtotal = '' # total cm in macdomain
-		self.modem = Modem()
-    
+
 	def extractData(self):
 		#Step 2.1:  #Reading and filtering the cmts output to include only modems
 		#by deleteing first 4 and last 2 lines, file is stored in cleanedlist
@@ -52,56 +52,169 @@ class MacDomain(object):
 		del cleanedlist[len(cleanedlist)-1]
 		self.cmtotal = len(cleanedlist)
 		fin.close()
-		print ('Total modems on card: %d' % self.cmtotal)
+		#print ('Total modems on card: %d' % self.cmtotal)
 	
+		"""
 		#Step 2.2 : - Line by line the cleanedlist is splitted into its values
-		#           - Modem is then created with these inital values	
-	
+					- Modem is then created with these inital values. After data has been written added and written into the file, this object
+					  is then deleted (to clear all values).	
+		"""
 		cmdatafromcmts = []
 		for line in cleanedlist:
+			modem = Modem() 
 			del cmdatafromcmts[:]
 			cmdatafromcmts = line.split()
 			
-			self.modem.mac = cmdatafromcmts[0].strip()
-			self.modem.ip = cmdatafromcmts[1].strip()
-			self.modem.iface = cmdatafromcmts[2].strip()
-			self.modem.state = cmdatafromcmts[3].strip()
-			self.modem.rxpwr = cmdatafromcmts[5].strip()
+			modem.mac = cmdatafromcmts[0].strip()
+			modem.ip = cmdatafromcmts[1].strip()
+			modem.iface = cmdatafromcmts[2].strip()
+			modem.state = cmdatafromcmts[3].strip()
+			modem.rxpwr = cmdatafromcmts[5].strip()
 			
 			print "Modem Mac: " + cmdatafromcmts[0]
 
 			#Step 2.3 : - Telneting to cmts, running verbose command, storing output in telnetoutput
 			#           - Filtering verbose values and adding them to created modem object   
 			ubr01shr.getCMverbose(cmdatafromcmts[0])
-			self.modem.setUSData()
+			modem.setUSData()
 		
 			#Step 2.4 : - Gathering CM DS Data by SNMP and storing them in created modem object
-			self.modem.setDSData()
+			modem.setDSData()
 
 			#Step 2.5: writing <tr> with all the modem values into ./result.html, the returned file by AJAX
-			if 'DOC3.0' in self.modem.macversion:
-				self.writeD3data()
+			if 'DOC3.0' in modem.macversion:
+				self.writeD3data(modem)
 			else:
-				self.writeD2data()
+				self.writeD2data(modem)
+			# !DEBUG: ISSUE 5.2 setting a timeout. This should give the app enough time to write the complete data into the file
+			# time.sleep(2)
+			del modem
 	
-	def writeD3data(self):
+	def writeD3data(self, modem):
 		RESULT.write('<tr>')
-		RESULT.write('<td>' + self.modem.mac + '</td>')
-		RESULT.write('<td>' + self.modem.ip + '</td>')
-		RESULT.write('<td>' + self.modem.iface + '</td>')
-		RESULT.write('<td>' + self.modem.state + '</td>')
-		RESULT.write('<td>' + self.modem.rxpwr + '</td>')
+		RESULT.write('<td>' + modem.mac + '</td>')
+		RESULT.write('<td>' + modem.ip + '</td>')
+		RESULT.write('<td>' + modem.iface + '</td>')
+		RESULT.write('<td>' + modem.state + '</td>')
+		RESULT.write('<td>' + modem.rxpwr + '</td>')
+		
+		for value in modem.macversion:
+			RESULT.write('<td>' + value + '</td>')
+		for value in modem.upsnr:
+			RESULT.write('<td>' + value + '</td>')
+		for value in modem.receivedpwr:
+			RESULT.write('<td>' + value + '</td>')
+		for value in modem.reportedtransmitpwr:
+			RESULT.write('<td>' + value + '</td>')
+		for value in modem.dspwr:
+			RESULT.write('<td>' + value + '</td>')
+		for value in modem.toff:
+			RESULT.write('<td>' + value + '</td>')
+		for value in modem.uncorrectables:
+			RESULT.write('<td>' + value + '</td>')
+		for value in modem.flaps:
+			RESULT.write('<td>' + value + '</td>')
+		for value in modem.errors:
+			RESULT.write('<td>' + value + '</td>')
+		for value in modem.reason:
+			RESULT.write('<td>' + value + '</td>')
+			
+		for value in modem.docsIfDownChannelPower:
+			RESULT.write('<td>' + value + '</td>')
+		for value in modem.docsIfSigQSignalNoise:
+			RESULT.write('<td>' + value + '</td>')
+		for value in modem.docsIfSigQUncorrectables:
+			RESULT.write('<td>' + value + '</td>')
+		for value in modem.docsIfSigQMicroreflections:
+			RESULT.write('<td>' + value + '</td>')
+		for value in modem.docsIfCmStatusTxPower:
+			RESULT.write('<td>' + value + '</td>')
+		for value in modem.docsIfCmStatusInvalidUcds:
+			RESULT.write('<td>' + value + '</td>')
+		for value in modem.docsIfCmStatusT3Timeouts:
+			RESULT.write('<td>' + value + '</td>')
+		for value in modem.docsIfCmStatusT4Timeouts:
+			RESULT.write('<td>' + value + '</td>')
+		
 		RESULT.write('</tr>')
 		
-	def writeD2data(self):
+	def writeD2data(self, modem):
+	
+		#First empty cells need to be created in the lists, so D3 and D2 Values can be displayed in the same table
+		#Upstream 
+		modem.upsnr.append('-')
+		modem.receivedpwr.append('-')
+		modem.reportedtransmitpwr.append('-')
+		modem.reportedtransmitpwr.append('-')
+		modem.toff.insert(1,'-')
+		modem.toff.insert(3,'-')
+		modem.uncorrectables.append('-')
+		modem.reason.append('-')
+		
+		#Downstream
+		modem.docsIfDownChannelPower.append('-')
+		modem.docsIfDownChannelPower.append('-')
+		modem.docsIfDownChannelPower.append('-')
+		modem.docsIfSigQSignalNoise.append('-')
+		modem.docsIfSigQSignalNoise.append('-')
+		modem.docsIfSigQSignalNoise.append('-')
+		modem.docsIfSigQUncorrectables.append('-')
+		modem.docsIfSigQUncorrectables.append('-')
+		modem.docsIfSigQUncorrectables.append('-')
+		modem.docsIfSigQMicroreflections.append('-')
+		modem.docsIfSigQMicroreflections.append('-')
+		modem.docsIfSigQMicroreflections.append('-')
+		
+		#Writing table row
 		RESULT.write('<tr>')
-		RESULT.write('<td>' + self.modem.mac + '</td>')
-		RESULT.write('<td>' + self.modem.ip + '</td>')
-		RESULT.write('<td>' + self.modem.iface + '</td>')
-		RESULT.write('<td>' + self.modem.state + '</td>')
-		RESULT.write('<td>' + self.modem.rxpwr + '</td>')
+		RESULT.write('<td>' + modem.mac + '</td>')
+		RESULT.write('<td>' + modem.ip + '</td>')
+		RESULT.write('<td>' + modem.iface + '</td>')
+		RESULT.write('<td>' + modem.state + '</td>')
+		RESULT.write('<td>' + modem.rxpwr + '</td>')
+		
+		#Upstream
+		for value in modem.macversion:
+			RESULT.write('<td>' + value + '</td>')
+		for value in modem.upsnr:
+			RESULT.write('<td>' + value + '</td>')
+		for value in modem.receivedpwr:
+			RESULT.write('<td>' + value + '</td>')
+		for value in modem.reportedtransmitpwr:
+			RESULT.write('<td>' + value + '</td>')	
+		for value in modem.dspwr:
+			RESULT.write('<td>' + value + '</td>')
+		for value in modem.toff:
+			RESULT.write('<td>' + value + '</td>')
+		for value in modem.uncorrectables:
+			RESULT.write('<td>' + value + '</td>')
+		for value in modem.flaps:
+			RESULT.write('<td>' + value + '</td>')	
+		for value in modem.errors:
+			RESULT.write('<td>' + value + '</td>')
+		for value in modem.reason:
+			RESULT.write('<td>' + value + '</td>')
+			
+		#Downstream
+		for value in modem.docsIfDownChannelPower:
+			RESULT.write('<td>' + value + '</td>')
+		for value in modem.docsIfSigQSignalNoise:
+			RESULT.write('<td>' + value + '</td>')
+		for value in modem.docsIfSigQUncorrectables:
+			RESULT.write('<td>' + value + '</td>')
+		for value in modem.docsIfSigQMicroreflections:
+			RESULT.write('<td>' + value + '</td>')
+		for value in modem.docsIfCmStatusTxPower:
+			RESULT.write('<td>' + value + '</td>')
+		for value in modem.docsIfCmStatusInvalidUcds:
+			RESULT.write('<td>' + value + '</td>')
+		for value in modem.docsIfCmStatusT3Timeouts:
+			RESULT.write('<td>' + value + '</td>')
+		for value in modem.docsIfCmStatusT4Timeouts:
+			RESULT.write('<td>' + value + '</td>')
+			
 		RESULT.write('</tr>')
-
+		
 
 class Modem(object):
 	snmpcommunity = 'web4suhr'
@@ -202,7 +315,9 @@ class Modem(object):
 			#this will then be displayed as soon as script finishes
 			global ONLINE
 			ONLINE += 1
-
+			
+			# !DEBUG: ISSUE 5.3: Temporary disabling snmp requests, as not necessary.
+			
 			receivedsnmpvalues = self.getsnmp()
 			for mib, snmpvalue in sorted(receivedsnmpvalues.iteritems()):
 				if 'docsIfDownChannelPower' in mib:
@@ -221,7 +336,7 @@ class Modem(object):
 					self.docsIfCmStatusT3Timeouts.append(snmpvalue)
 				if 'docsIfCmStatusT4Timeouts' in mib:
 					self.docsIfCmStatusT4Timeouts.append(snmpvalue)
-	
+				
 	def getsnmp(self):
 		snmpvalue = {}  #dictionary which will be returned
 		cmdGen = cmdgen.CommandGenerator()
@@ -261,7 +376,6 @@ class Modem(object):
 		#print snmpvalue
 		return snmpvalue
 
-
 class TelnetAccess(object):
 	# Defining regular expressions for the different prompts here
 	ios_unprivPrompt = re.compile ('.*>')
@@ -292,7 +406,8 @@ class TelnetAccess(object):
 		#Executing command and returning output
 		#self.tn.expect(TelnetAccess.regexlist)
 		self.tn.write(command + "\n")
-		time.sleep(0.3)
+		# !DEBUG: ISSUE 5.1 - Setting Timeout from 0.3 to 2 s, giving the app enought time to write the commands output
+		time.sleep(1) 
 		output = self.tn.read_very_eager()
 		self.telnetoutput.write(output)
 
@@ -309,18 +424,63 @@ def createHTMLHeader():
 	RESULT.write('<html>')
 	RESULT.write('<head>')
 	RESULT.write('<meta charset="utf-8">')
+	RESULT.write('<style type="text/css">td {color:blue; white-space:nowrap} </style>') # !Temporary formating of td
 	RESULT.write('</head>')
 	RESULT.write('<body>')
+	
+def createTableHeader():
 	RESULT.write('<table border=1>')
+	RESULT.write('<tr>')
+	RESULT.write('<th>mac</th>')
+	RESULT.write('<th>ip</th>')
+	RESULT.write('<th>iface</th>')
+	RESULT.write('<th>state</th>')
+	RESULT.write('<th>rxpwr</th>') 
+	RESULT.write('<th>Docsis</th>')
+	RESULT.write('<th>upsnr</th>')
+	RESULT.write('<th>upsnr</th>')
+	RESULT.write('<th>receivedpwr</th>')
+	RESULT.write('<th>receivedpwr</th>')
+	RESULT.write('<th>reportedtransmitpwr</th>')
+	RESULT.write('<th>reportedtransmitpwr</th>')
+	RESULT.write('<th>dspwr</th>')
+	RESULT.write('<th>toff</th>')
+	RESULT.write('<th>toff</th>')
+	RESULT.write('<th>init toff</th>')
+	RESULT.write('<th>init toff</th>')
+	RESULT.write('<th>uncorrectables</th>')
+	RESULT.write('<th>uncorrectables</th>')
+	RESULT.write('<th>flaps</th>')
+	RESULT.write('<th>errors</th>')
+	RESULT.write('<th>reason</th>')
+	RESULT.write('<th>docsIfDownChannelPower</th>')
+	RESULT.write('<th>docsIfDownChannelPower</th>')
+	RESULT.write('<th>docsIfDownChannelPower</th>')
+	RESULT.write('<th>docsIfDownChannelPower</th>')
+	RESULT.write('<th>docsIfSigQSignalNoise</th>')
+	RESULT.write('<th>docsIfSigQSignalNoise</th>')
+	RESULT.write('<th>docsIfSigQSignalNoise</th>')
+	RESULT.write('<th>docsIfSigQSignalNoise</th>')
+	RESULT.write('<th>docsIfSigQUncorrectables</th>')
+	RESULT.write('<th>docsIfSigQUncorrectables</th>')
+	RESULT.write('<th>docsIfSigQUncorrectables</th>')
+	RESULT.write('<th>docsIfSigQUncorrectables</th>')
+	RESULT.write('<th>docsIfSigQMicroreflections</th>')
+	RESULT.write('<th>docsIfSigQMicroreflections</th>')
+	RESULT.write('<th>docsIfSigQMicroreflections</th>')
+	RESULT.write('<th>docsIfSigQMicroreflections</th>')
+	RESULT.write('<th>docsIfCmStatusTxPower</th>')
+	RESULT.write('<th>docsIfCmStatusInvalidUcds</th>')
+	RESULT.write('<th>docsIfCmStatusT3Timeouts</th>')
+	RESULT.write('<th>docsIfCmStatusT4Timeouts</th>')
+	RESULT.write('</tr>')
 	
 def createHTMLFooter():
 	RESULT.write('</table>')
 	RESULT.write('</body>')
 	RESULT.write('</html>')
 
-
 #Main
-
 #Global Parameters
 IOS_UID = 'dscript'
 IOS_PW = 'hf4ev671'
@@ -332,8 +492,9 @@ Step 1: Create CMTS Object, telnet cmts and login, issue command, receive cm lis
 		Just to test this script the mac domain is entered manually into this script
 """
 
-# 1.1 - Creating html header 
+# 1.1 - Creating html and table header 
 createHTMLHeader()
+createTableHeader()
 
 # 1.2 - Script Processing
 ubr01shr = Cmts('10.10.10.50', 'ubr01shr')
@@ -361,7 +522,8 @@ createHTMLFooter()
 RESULT.close()
 del ubr01shr
 
-""""
+
+"""
 # Keeping this for copy past purposes for the time being
 # Step 3 - Creating Output
 #print "Content-type:text/html\r\n\r\n"
@@ -471,7 +633,8 @@ print "</body>"
 print "</html>"
 
 """
-""""
+"""
+# Console output
 for cm in ubr01shr.macdomains.cmlist:
 	print 'mac:                         ' + cm.mac
 	print 'ip:                          ' + cm.ip
