@@ -8,11 +8,11 @@ import json
 
 data = {}
 
-datafinal = open('./static/datafileFinalCall', 'w')
-datafinal.write ("<b>YAY</b> :)))) This was the final Ajax call, returning the static website")
+datafinal = open('/var/www/dscript/static/datafileFinalCall', 'w')
+datafinal.write (":)))) This was the final Ajax call, returning the static website")
 datafinal.close()
 
-datacount = open('./datafileCount', 'w')
+datacount = open('/var/www/dscript/static/datafileCount', 'w')
 total = 500000
 for i in range(total+1):
 	data = {'total' : total, 'count': i, 'status' : 0}
