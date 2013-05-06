@@ -22,7 +22,6 @@ urls = (
 app = web.application(urls, globals(), autoreload=False)
 application = app.wsgifunc()
 
-
 #Homepage
 class index:
 	def GET(self):
@@ -59,3 +58,4 @@ class count:
 if __name__ == "__main__":
 	app = web.application(urls, globals())
 	app.run()
+	

@@ -1,17 +1,16 @@
 #!/usr/bin/python
 """
-    Version:	0.1.1 - New Concept using webpy and ajax instead of plain old cgi 
-    Author:		Memleak13
-    Date:		04.05.13 - 21:00
+	Version:	0.1.1 - New Concept using webpy and ajax instead of plain old cgi 
+	Author:		Memleak13
+	Date:		06.05.13 - 23:00
 """
 
 import re
 import sys
 import time
 import telnetlib
+import json
 from pysnmp.entity.rfc3413.oneliner import cmdgen
-
-#Class Definitions
 
 class Cmts(object):
 	def __init__(self, ip, name):
@@ -38,19 +37,19 @@ class Cmts(object):
 class MacDomain(object):
 	def __init__(self, name):
 		self.name = name
-		self.cmtotal = '' # total cm in macdomain
 
 	def extractData(self):
 		#Step 2.1:  #Reading and filtering the cmts output to include only modems
 		#by deleteing first 4 and last 2 lines, file is stored in cleanedlist
-		fin = open  ('./telnetoutput', 'r') #('./test','r') #in production change to telnetoutput
+		fin = open('./static/telnetoutput', 'r') #('./test','r') #in production change to telnetoutput
 		cleanedlist = []
 		for line in fin: 
 			cleanedlist.append(line)
 		del cleanedlist[0:4]
 		del cleanedlist[len(cleanedlist)-1]
 		del cleanedlist[len(cleanedlist)-1]
-		self.cmtotal = len(cleanedlist)
+		global CM_TOTAL
+		CM_TOTAL = len(cleanedlist)
 		fin.close()
 		#print ('Total modems on card: %d' % self.cmtotal)
 	
@@ -88,6 +87,9 @@ class MacDomain(object):
 				self.writeD2data(modem)
 			# !DEBUG: ISSUE 5.2 setting a timeout. This should give the app enough time to write the complete data into the file
 			# time.sleep(2)
+			global CM_COUNT
+			CM_COUNT+=1
+			writeState();
 			del modem
 	
 	def writeD3data(self, modem):
@@ -248,7 +250,7 @@ class Modem(object):
     
 	#Setting data gathered from cmts verbose, flaps, erros and dspwr are strings
 	def setUSData(self):
-		fin = open ('./telnetoutput', 'r')
+		fin = open('./static/telnetoutput', 'r')
 		for line in fin:
 			#each line is checked for the expression, the splitted into values, first ":" as perimeter,
 			#then to seperate multiple values (Bondend), it is splitted again with " "
@@ -311,13 +313,12 @@ class Modem(object):
 	#TEST: The values needs to be checked as dictionaries are generally unsorted!
 	def setDSData(self):
 		if 'online' in self.state:
-			#ONLINE counts the amount of online modems snmp requests are sent to 
+			#CM_ONLINE counts the amount of online modems snmp requests are sent to 
 			#this will then be displayed as soon as script finishes
-			global ONLINE
-			ONLINE += 1
+			global CM_ONLINE
+			CM_ONLINE += 1
 			
-			# !DEBUG: ISSUE 5.3: Temporary disabling snmp requests, as not necessary.
-			
+			# !DEBUG: Disable SNMP						
 			receivedsnmpvalues = self.getsnmp()
 			for mib, snmpvalue in sorted(receivedsnmpvalues.iteritems()):
 				if 'docsIfDownChannelPower' in mib:
@@ -401,12 +402,12 @@ class TelnetAccess(object):
 
 	def runCommand(self,command):
 		#Opening filehandle
-		self.telnetoutput = open('telnetoutput', 'w')
+		self.telnetoutput = open('./static/telnetoutput', 'w')
 
 		#Executing command and returning output
 		#self.tn.expect(TelnetAccess.regexlist)
 		self.tn.write(command + "\n")
-		# !DEBUG: ISSUE 5.1 - Setting Timeout from 0.3 to 2 s, giving the app enought time to write the commands output
+		# !DEBUG: ISSUE 5.1 - Setting Timeout from 0.3 to 0.75 s, giving the app enought time to write the commands output
 		time.sleep(0.75) 
 		output = self.tn.read_very_eager()
 		self.telnetoutput.write(output)
@@ -418,13 +419,12 @@ class TelnetAccess(object):
 		self.tn.close()
 
 
-
 def createHTMLHeader():
 	RESULT.write('<!DOCTYPE HTML>')
 	RESULT.write('<html>')
 	RESULT.write('<head>')
 	RESULT.write('<meta charset="utf-8">')
-	RESULT.write('<style type="text/css">td {color:blue; white-space:nowrap} </style>') # !Temporary formating of td
+	RESULT.write('<style type="text/css">td {color:blue; white-space:nowrap} </style>')
 	RESULT.write('</head>')
 	RESULT.write('<body>')
 	
@@ -479,13 +479,21 @@ def createHTMLFooter():
 	RESULT.write('</table>')
 	RESULT.write('</body>')
 	RESULT.write('</html>')
+def writeState(): #writes the modem and runstatus of the app into a file. This file serves as a counter for ajax
+	data = {'CM_TOTAL' : CM_TOTAL, 'CM_COUNT': CM_COUNT, 'CM_ONLINE' : CM_ONLINE, 'RUN_STATE' : RUN_STATE}
+	STATUS.seek(0)	#move to beginning of file
+	STATUS.write(json.dumps(data))
 
-#Main
+# !MAIN
 #Global Parameters
+RUN_STATE = 1	#states if the script is running (0=no, 1=yes)
+CM_TOTAL = ''	#holds all CM in macdomain
+CM_COUNT = 0	#holds number of processed modems
+CM_ONLINE = 0	#this counter counts only online modems
 IOS_UID = 'dscript'
 IOS_PW = 'hf4ev671'
-ONLINE = 0  #to compare performance. This counter counts every online modem, while running through the script
-RESULT = open('./result.html', 'w')
+RESULT = open('./static/result.html', 'w')	#Holds the file which will be returned by ajax
+STATUS = open('./static/status', 'w')	#holds counter values and runstate
 
 """
 Step 1: Create CMTS Object, telnet cmts and login, issue command, receive cm list
@@ -498,7 +506,7 @@ createTableHeader()
 
 # 1.2 - Script Processing
 ubr01shr = Cmts('10.10.10.50', 'ubr01shr')
-ubr01shr.createMacDomain('5/0/4') # !Setting Macdomain
+ubr01shr.createMacDomain('5/0/4') # !Enter Macdomain
 ubr01shr.getCMs()
 
 """
@@ -507,177 +515,18 @@ Step 2 (2.1 - 2.5):	- Extract Data from cm list (telnet output from cmts)
 					- Populate CM values from CMTS and CM (SNMP)
 					- Add all CMs to macdomain.clist	 
 """
-
 ubr01shr.macdomains.extractData()	  	
-print ('Total modems on card: %d' % ubr01shr.macdomains.cmtotal)
-print 'ONLINE %d' % ONLINE
+print ('Total modems on card: %d' % CM_TOTAL)
+print 'CM_ONLINE %d' % CM_ONLINE
 
 """
 #Step 3 - Creating HTML footer
 """
-
 createHTMLFooter()
 
 #Cleaning up
-RESULT.close()
 del ubr01shr
-
-
-"""
-# Keeping this for copy past purposes for the time being
-# Step 3 - Creating Output
-#print "Content-type:text/html\r\n\r\n"
-#print "<!DOCTYPE HTML>"
-#print "<html>"
-#print "<head>"
-#print selected
-#print "</head>"
-#print "<body>"
-
-print "<table border=1>"
-print "<tr>"
-print "<th>mac</th>"
-print "<th>ip</th>"
-print "<th>iface</th>"
-print "<th>state</th>"
-print "<th>rxpwr</th>" 
-print "<th>Docsis</th>"
-print "<th>upsnr</th>"
-print "<th>upsnr</th>"
-print "<th>receivedpwr</th>"
-print "<th>receivedpwr</th>"
-print "<th>reportedtransmitpwr</th>"
-print "<th>reportedtransmitpwr</th>"
-print "<th>dspwr</th>"
-print "<th>toff</th>"
-print "<th>toff</th>"
-print "<th>toff</th>"
-print "<th>toff</th>"
-print "<th>uncorrectables</th>"
-print "<th>uncorrectables</th>"
-print "<th>flaps</th>"
-print "<th>errors</th>"
-print "<th>reason</th>"
-print "<th>docsIfDownChannelPower</th>"
-print "<th>docsIfDownChannelPower</th>"
-print "<th>docsIfDownChannelPower</th>"
-print "<th>docsIfDownChannelPower</th>"
-print "<th>docsIfSigQSignalNoise</th>"
-print "<th>docsIfSigQSignalNoise</th>"
-print "<th>docsIfSigQSignalNoise</th>"
-print "<th>docsIfSigQSignalNoise</th>"
-print "<th>docsIfSigQUncorrectables</th>"
-print "<th>docsIfSigQUncorrectables</th>"
-print "<th>docsIfSigQUncorrectables</th>"
-print "<th>docsIfSigQUncorrectables</th>"
-print "<th>docsIfSigQMicroreflections</th>"
-print "<th>docsIfSigQMicroreflections</th>"
-print "<th>docsIfSigQMicroreflections</th>"
-print "<th>docsIfSigQMicroreflections</th>"
-print "<th>docsIfCmStatusTxPower</th>"
-print "<th>docsIfCmStatusInvalidUcds</th>"
-print "<th>docsIfCmStatusT3Timeouts</th>"
-print "<th>docsIfCmStatusT4Timeouts</th>"
-print "</tr>"
-
-for cm in ubr01shr.macdomains.cmlist:
-	if "DOC3.0" in cm.macversion:
-		print "<tr>"
-		print "<td>" + cm.mac + "</td>"
-		print "<td>" + cm.ip + "</td>"
-		print "<td>" + cm.iface + "</td>"
-		print "<td>" + cm.state + "</td>"
-		print "<td>" + cm.rxpwr + "</td>"
-
-		for value in cm.macversion:
-			print "<td>" + value + "</td>"
-		for value in cm.upsnr:
-			print "<td>" + value + "</td>"
-		for value in cm.receivedpwr:
-			print "<td>" + value + "</td>"
-		for value in cm.reportedtransmitpwr:
-			print "<td>" + value + "</td>"
-		for value in cm.dspwr:
-			print "<td>" + value + "</td>"
-		for value in cm.toff:
-			print "<td>" + value + "</td>"
-		for value in cm.uncorrectables:
-			print "<td>" + value + "</td>"
-		for value in cm.flaps:
-			print "<td>" + value + "</td>"
-		for value in cm.errors:
-			print "<td>" + value + "</td>"
-		for value in cm.reason:
-			print "<td>" + value + "</td>"
-
-		for value in cm.docsIfDownChannelPower:
-			print "<td>" + value + "</td>"
-		for value in cm.docsIfSigQSignalNoise:
-			print "<td>" + value + "</td>"
-		for value in cm.docsIfSigQUncorrectables:
-			print "<td>" + value + "</td>"
-		for value in cm.docsIfSigQMicroreflections:
-			print "<td>" + value + "</td>"
-		for value in cm.docsIfCmStatusTxPower:
-			print "<td>" + value + "</td>"
-		for value in cm.docsIfCmStatusInvalidUcds:
-			print "<td>" + value + "</td>"
-		for value in cm.docsIfCmStatusT3Timeouts:
-			print "<td>" + value + "</td>"
-		for value in cm.docsIfCmStatusT4Timeouts:
-			print "<td>" + value + "</td>"
-		print "</tr>"
-
-print "</table>"
-print "</body>"
-print "</html>"
-
-"""
-"""
-# Console output
-for cm in ubr01shr.macdomains.cmlist:
-	print 'mac:                         ' + cm.mac
-	print 'ip:                          ' + cm.ip
-	print 'iface:                       ' + cm.iface
-	print 'state:                       ' + cm.state
-	print 'rxpwr:                       ' + cm.rxpwr
-
-	for value in cm.macversion:
-		print 'macversion:                  ' + value
-	for value in cm.upsnr:
-		print 'upsnr:                       ' + value
-	for value in cm.receivedpwr:
-		print 'receivedpwr:                 ' + value
-	for value in cm.reportedtransmitpwr:
-		print 'reportedtransmitpwr:         ' + value
-	for value in cm.dspwr:
-		print 'dspwr:                       ' + value
-	for value in cm.toff:
-		print 'toff:                        ' + value
-	for value in cm.uncorrectables:
-		print 'uncorrectables:              ' + value
-	for value in cm.flaps:
-		print 'flaps:                       ' + value
-	for value in cm.errors:
-		print 'errors:                      ' + value
-	for value in cm.reason:
-		print 'reason:                      ' + value
-	
-	for value in cm.docsIfDownChannelPower:
-		print 'docsIfDownChannelPower:      ' + value
-	for value in cm.docsIfSigQSignalNoise:
-		print 'docsIfSigQSignalNoise:       ' + value
-	for value in cm.docsIfSigQUncorrectables:
-		print 'docsIfSigQUncorrectables:    ' + value
-	for value in cm.docsIfSigQMicroreflections:
-		print 'docsIfSigQMicroreflections:  ' + value
-	for value in cm.docsIfCmStatusTxPower:
-		print 'docsIfCmStatusTxPower:       ' + value        
-	for value in cm.docsIfCmStatusInvalidUcds:
-		print 'docsIfCmStatusInvalidUcds:   ' + value
-	for value in cm.docsIfCmStatusT3Timeouts:
-		print 'docsIfCmStatusT3Timeouts:    ' + value
-	for value in cm.docsIfCmStatusT4Timeouts:
-		print 'docsIfCmStatusT4Timeouts:    ' + value
-	print "**********************************\n\n"
-"""
+RUN_STATE=0
+writeState()
+STATUS.close()
+RESULT.close()
