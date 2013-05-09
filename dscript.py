@@ -2,12 +2,12 @@
 """
 	Version:	0.1.1 - New Concept using webpy and ajax instead of plain old cgi 
 	Author:		Memleak13
-	Date:		06.05.13 - 23:00
+	Date:		09.05.13 - 12:00
 """
 
 import re
 import sys
-import time
+import time        
 import telnetlib
 import json
 from pysnmp.entity.rfc3413.oneliner import cmdgen
@@ -23,7 +23,7 @@ class Cmts(object):
 		self.macdomains  = MacDomain(iface)
 
 	def getCMs(self):
-		self.tn.runCommand('show cable modem cable ' + ubr01shr.macdomains.name)
+		self.tn.runCommand('show cable modem cable ' + str(self.macdomains.name))
 
 	def getCMverbose(self, cmmac):
 		self.tn.runCommand('show cable modem ' + cmmac + ' verbose')
@@ -41,7 +41,7 @@ class MacDomain(object):
 	def extractData(self):
 		#Step 2.1:  #Reading and filtering the cmts output to include only modems
 		#by deleteing first 4 and last 2 lines, file is stored in cleanedlist
-		fin = open('./static/telnetoutput', 'r') #('./test','r') #in production change to telnetoutput
+		fin = open('/home/tbsadmin/projects/dscript/static/telnetoutput', 'r')
 		cleanedlist = []
 		for line in fin: 
 			cleanedlist.append(line)
@@ -250,7 +250,7 @@ class Modem(object):
     
 	#Setting data gathered from cmts verbose, flaps, erros and dspwr are strings
 	def setUSData(self):
-		fin = open('./static/telnetoutput', 'r')
+		fin = open('/home/tbsadmin/projects/dscript/static/telnetoutput', 'r')
 		for line in fin:
 			#each line is checked for the expression, the splitted into values, first ":" as perimeter,
 			#then to seperate multiple values (Bondend), it is splitted again with " "
@@ -337,7 +337,7 @@ class Modem(object):
 					self.docsIfCmStatusT3Timeouts.append(snmpvalue)
 				if 'docsIfCmStatusT4Timeouts' in mib:
 					self.docsIfCmStatusT4Timeouts.append(snmpvalue)
-				
+	
 	def getsnmp(self):
 		snmpvalue = {}  #dictionary which will be returned
 		cmdGen = cmdgen.CommandGenerator()
@@ -402,13 +402,12 @@ class TelnetAccess(object):
 
 	def runCommand(self,command):
 		#Opening filehandle
-		self.telnetoutput = open('./static/telnetoutput', 'w')
-
+		self.telnetoutput = open('/home/tbsadmin/projects/dscript/static/telnetoutput', 'w')		
 		#Executing command and returning output
 		#self.tn.expect(TelnetAccess.regexlist)
 		self.tn.write(command + "\n")
 		# !DEBUG: ISSUE 5.1 - Setting Timeout from 0.3 to 0.75 s, giving the app enought time to write the commands output
-		time.sleep(0.75) 
+		time.sleep(0.5) 
 		output = self.tn.read_very_eager()
 		self.telnetoutput.write(output)
 
@@ -479,21 +478,25 @@ def createHTMLFooter():
 	RESULT.write('</table>')
 	RESULT.write('</body>')
 	RESULT.write('</html>')
+		
+
+#Writes the counter and running state into the status file which is read by ajax
 def writeState(): #writes the modem and runstatus of the app into a file. This file serves as a counter for ajax
 	data = {'CM_TOTAL' : CM_TOTAL, 'CM_COUNT': CM_COUNT, 'CM_ONLINE' : CM_ONLINE, 'RUN_STATE' : RUN_STATE}
 	STATUS.seek(0)	#move to beginning of file
 	STATUS.write(json.dumps(data))
 
 # !MAIN
-#Global Parameters
+
 RUN_STATE = 1	#states if the script is running (0=no, 1=yes)
 CM_TOTAL = ''	#holds all CM in macdomain
 CM_COUNT = 0	#holds number of processed modems
 CM_ONLINE = 0	#this counter counts only online modems
 IOS_UID = 'dscript'
 IOS_PW = 'hf4ev671'
-RESULT = open('./static/result.html', 'w')	#Holds the file which will be returned by ajax
-STATUS = open('./static/status', 'w')	#holds counter values and runstate
+RESULT = open('/home/tbsadmin/projects/dscript/static/result.html', 'w')	#Holds the file which will be returned by ajax
+STATUS = open('/home/tbsadmin/projects/dscript/static/status', 'w')			#holds counter values and runstate
+#DEBUG = open('/home/tbsadmin/projects/dscript/static/debug', 'w')
 
 """
 Step 1: Create CMTS Object, telnet cmts and login, issue command, receive cm list
@@ -504,23 +507,25 @@ Step 1: Create CMTS Object, telnet cmts and login, issue command, receive cm lis
 createHTMLHeader()
 createTableHeader()
 
-# 1.2 - Script Processing
+# 1.2 - Receiving argv value, telneting to cmts 
+argv = str(sys.argv[1])
+
 ubr01shr = Cmts('10.10.10.50', 'ubr01shr')
-ubr01shr.createMacDomain('5/0/4') # !Enter Macdomain
+
+ubr01shr.createMacDomain(argv)
+
 ubr01shr.getCMs()
 
+""" Step 2 (2.1 - 2.5):	- Extract Data from cm list (telnet output from cmts)
+						- Create Modem Object
+						- Populate CM values from CMTS and CM (SNMP)
+						- Add all CMs to macdomain.clist	 
 """
-Step 2 (2.1 - 2.5):	- Extract Data from cm list (telnet output from cmts)
-					- Create Modem Object
-					- Populate CM values from CMTS and CM (SNMP)
-					- Add all CMs to macdomain.clist	 
-"""
-ubr01shr.macdomains.extractData()	  	
-print ('Total modems on card: %d' % CM_TOTAL)
-print 'CM_ONLINE %d' % CM_ONLINE
 
+ubr01shr.macdomains.extractData()	 
+ 	
 """
-#Step 3 - Creating HTML footer
+#Step 3 - Creating HTML footer and cleaning up
 """
 createHTMLFooter()
 

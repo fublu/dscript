@@ -12,35 +12,38 @@ $def with ()
 					//Init of the timer, the timer called by the first Ajax request, see below
 					//The timer asks regulary the server for a status update, receveing the total
 					//amount, the counter and a statusfield. As soon as the statusfield reaches 1
-					//the requests are stopped and the final page is displayed.
+					//the requests are stopped and the final page is displayed.				
 					jQuery("div").timer({
-						delay: 100,
+						delay: 1000,
 						repeat: true,
 						autostart: false,
 						callback: function(index) { //console.log ("Debug: Timer Started");
 							//console.log ("Debug: Repeating AjaxCall requesting count");
-							jQuery.getJSON("http://dscript.ziknet.ch/count")
+							jQuery.getJSON("http://dscript.ziknet.ch/counter")
 							.done(function(response) {
 								//console.log ("Debug: AJAX - Received JSON");
-								jQuery("div").html(response.count + "/" + response.total + " - Status: " + response.status);
-								if (response.status == 1) {
+								jQuery("div").html(response.CM_COUNT + "/" + response.CM_TOTAL + " - Status: " + response.RUN_STATE);
+								if (response.RUN_STATE == 0) {
 									jQuery("div").timer('stop');
-									alert("Load Final Page?");
-									jQuery("div").load("http://dscript.ziknet.ch:/static/datafileFinalCall");
+									jQuery("div").load("http://dscript.ziknet.ch/static/result.html");
 								}
 							});
 						}	
 					});
-					//Causes the timer to be reset
+					//Stopping the timer causes the timer to be reset
 					//If not there would only be one run as the timer will have reached its limit (if manual repeat of 15 for example)
 					jQuery("div").timer('stop');
+					
+					//Getting the selected value (ex 5/1/0)
+					var macdomain = jQuery("select").val();
+					
 					//First Ajax request - Run the script 
-					jQuery.ajax({url: "http://dscript.ziknet.ch/runscript"})
+					jQuery.ajax({url: "http://dscript.ziknet.ch/runscript", data: {macdomain: macdomain}}) // {description:var}
 					.done(function(response) {
 						//console.log("Debug: AJAX - Script has been started successfully");
 						//console.log("Debug: Starting Timer");
 						//Clause which handles the procedure if the script is already running
-						if (response == 0) {
+						if (response == 1) {
 							jQuery("div").html("<h1><b>The Script is already running!!! </b></h1> Please try again later...");
 							jQuery("button").remove();
 						}
@@ -48,14 +51,32 @@ $def with ()
 							jQuery("div").timer('start');
 						}
 					});
-					
 				});
 			});
 		</script>
 	</head>
 	<body>
 		<button>Click Me</button>
+		<select>
+			<option value="5/0/0">C5/0/0</option>     
+			<option value="5/0/1">C5/0/1</option>     
+			<option value="5/0/2">C5/0/2</option>     
+			<option value="5/0/3">C5/0/3</option>        
+			<option value="5/0/4">C5/0/4</option>           
+			<option value="5/1/0">C5/1/0</option>            
+			<option value="5/1/1">C5/1/1</option>            
+			<option value="5/1/2">C5/1/2</option>            
+			<option value="5/1/3">C5/1/3</option>            
+			<option value="5/1/4">C5/1/4</option>            
+			<option value="6/1/0">C6/1/0</option>            
+			<option value="6/1/1">C6/1/1</option>                
+			<option value="6/1/2">C6/1/2</option>             
+			<option value="6/1/3">C6/1/3</option>           
+			<option value="6/1/4">C6/1/4</option>
+		</select>
 		<br><br>
 		<div></div>
 	</body>
 </html>
+
+ 
