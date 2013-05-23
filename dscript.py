@@ -407,7 +407,7 @@ class TelnetAccess(object):
 		#self.tn.expect(TelnetAccess.regexlist)
 		self.tn.write(command + "\n")
 		# !DEBUG: ISSUE 5.1 - Setting Timeout from 0.3 to 0.75 s, giving the app enought time to write the commands output
-		time.sleep(0.5) 
+		time.sleep(0.75) 
 		output = self.tn.read_very_eager()
 		self.telnetoutput.write(output)
 

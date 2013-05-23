@@ -41,12 +41,20 @@ $def with ()
 		<script type="text/javascript">
 			jQuery(document).ready(function() {
 				
+				//Check if Browser is IE
+		        if (navigator.userAgent.match(/msie/i) ){
+  					jQuery("button").remove();
+  					jQuery("select").remove();
+					jQuery("#status").html("Diese Seite ist nicht fuer den Internet Explorer optimiert. Bitte benutzen Sie Chrome, Firefox oder Safari");
+					return;
+		        }
+				
 				jQuery.getJSON("http://dscript.ziknet.ch/counter")
 				.done(function(response) {
 					//checks automatically if the script is already running,
 					//if so it will disable the input fields			
 					if (response.RUN_STATE == 1) {
-						jQuery("#status").html("<b>Die Applikation wird bereits ausgeführt</b><br>Bitte versuchen Sie es später nochmals...<br>Stand: " + response.CM_COUNT + "/" + response.CM_TOTAL);
+						jQuery("#status").html("<b>Die Anwendung wird bereits ausgeführt</b><br>Bitte versuchen Sie es später nochmals...<br>Stand: " + response.CM_COUNT + "/" + response.CM_TOTAL);
 						jQuery("button").attr('disabled', 'disabled');
 						jQuery("select").attr('disabled', 'disabled');
 					}
@@ -90,7 +98,7 @@ $def with ()
 						//Clause which handles the procedure if the script is already running
 						//Just in case the script wasn't running at the time the page was loaded, however started in the meantime
 						if (response == 1) {
-							jQuery("#status").html("<b>Die Applikation wird bereits ausgeführt</b><br>Bitte versuchen Sie es später nochmals...<br>Stand: " + response.CM_COUNT + "/" + response.CM_TOTAL);
+							jQuery("#status").html("<b>Die Anwendung wird bereits ausgeführt</b><br>Bitte versuchen Sie es später nochmals...<br>Stand: " + response.CM_COUNT + "/" + response.CM_TOTAL);
 							//jQuery("button").remove();
 							jQuery("button").attr('disabled', 'disabled');
 							jQuery("select").attr('disabled', 'disabled');
