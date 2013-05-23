@@ -13,13 +13,26 @@ $def with ()
 			text-align: center;
 			margin-left: auto;
 			margin-right: auto;
+			table-layout: fixed;
 		}
 		#status {
 			font-family:arial;
 			font-size: 10pt;
 			padding-top:5px;
 			text-align: center;
+			color: LightSlayGray;
 		}
+		#impressum {
+			font-family:arial;
+			font-size: 7pt;
+			padding-top:12px;
+			text-align: center;
+			color: SlateGray;
+			font-style: italic;
+		}
+		a:link {color:Blue;}
+		a:visited {color:Blue;}
+			
 		</style>
 			
 		<script type="text/javascript" src="http://code.jquery.com/jquery-1.8.3.min.js"></script>
@@ -27,6 +40,18 @@ $def with ()
 		<script type="text/javascript" src="/static/jquery.timer.js"></script>
 		<script type="text/javascript">
 			jQuery(document).ready(function() {
+				
+				jQuery.getJSON("http://dscript.ziknet.ch/counter")
+				.done(function(response) {
+					//checks automatically if the script is already running,
+					//if so it will disable the input fields			
+					if (response.RUN_STATE == 1) {
+						jQuery("#status").html("<b>Die Applikation wird bereits ausgeführt</b><br>Bitte versuchen Sie es später nochmals...<br>Stand: " + response.CM_COUNT + "/" + response.CM_TOTAL);
+						jQuery("button").attr('disabled', 'disabled');
+						jQuery("select").attr('disabled', 'disabled');
+					}
+				});
+				
 				jQuery("button").click(function() {
 					//Init of the timer, the timer called by the first Ajax request, see below
 					//The timer asks regulary the server for a status update, receveing the total
@@ -41,7 +66,8 @@ $def with ()
 							jQuery.getJSON("http://dscript.ziknet.ch/counter")
 							.done(function(response) {
 								//console.log ("Debug: AJAX - Received JSON");
-								jQuery("#status").html(response.CM_COUNT + "/" + response.CM_TOTAL + " - Status: " + response.RUN_STATE);
+								//jQuery("#status").html(response.CM_COUNT + "/" + response.CM_TOTAL + " - Status: " + response.RUN_STATE);
+								jQuery("#status").html(response.CM_COUNT + "/" + response.CM_TOTAL);
 								if (response.RUN_STATE == 0) {
 									jQuery("#status").timer('stop');
 									jQuery("#result").load("http://dscript.ziknet.ch/static/result.html");
@@ -62,8 +88,9 @@ $def with ()
 						//console.log("Debug: AJAX - Script has been started successfully");
 						//console.log("Debug: Starting Timer");
 						//Clause which handles the procedure if the script is already running
+						//Just in case the script wasn't running at the time the page was loaded, however started in the meantime
 						if (response == 1) {
-							jQuery("#status").html("<b>Die Anwedung wird bereits ausgeführt</b><br>Bitte versuchen Sie es später nochmals...");
+							jQuery("#status").html("<b>Die Applikation wird bereits ausgeführt</b><br>Bitte versuchen Sie es später nochmals...<br>Stand: " + response.CM_COUNT + "/" + response.CM_TOTAL);
 							//jQuery("button").remove();
 							jQuery("button").attr('disabled', 'disabled');
 							jQuery("select").attr('disabled', 'disabled');
@@ -82,7 +109,7 @@ $def with ()
 	<body id="body">		
 		<table id="layout">
 			<tr>
-				<td>
+				<td colspadn="2">
 					<select>
 						<option value="5/0/0">C5/0/0</option>     
 						<option value="5/0/1">C5/0/1</option>     
@@ -100,8 +127,6 @@ $def with ()
 						<option value="6/1/3">C6/1/3</option>           
 						<option value="6/1/4">C6/1/4</option>
 					</select>
-				</td>
-				<td>
 					<button>Go</button>
 				</td>
 			</tr>
@@ -109,6 +134,7 @@ $def with ()
 				<td colspan="2"><div id="status"><a href="/static/result.html">Letzte Abfrage</div></td>
 			</tr>
 		</table>
+		<div id="impressum"> Developed by Teletrend AG (JM) for Technische Betriebe Suhr - Version 0.2 (05.2013)</div>
 		<div id="result"></div>
 	</body>
 </html>

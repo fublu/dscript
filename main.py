@@ -12,8 +12,8 @@ from web import form
 
 #Need to set the absolute path for apache, otherwise it will not find the templates
 root = os.path.dirname(__file__)
-render = web.template.render(os.path.join(root, 'templates'))
-cache=False #Apache might send cached site backs otherwise
+render = web.template.render(os.path.join(root, 'templates'), cache=False)
+#cache=False Apache might send cached site backs otherwise
 
 urls = (
 	'/', 'index',
