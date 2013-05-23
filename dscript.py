@@ -422,13 +422,28 @@ def createHTMLHeader():
 	RESULT.write('<!DOCTYPE HTML>')
 	RESULT.write('<html>')
 	RESULT.write('<head>')
-	RESULT.write('<meta charset="utf-8">')
-	RESULT.write('<style type="text/css">td {color:blue; white-space:nowrap} </style>')
+	
+	RESULT.write('<link rel="stylesheet" href="/static/themes/blue/style.css" />')
+	RESULT.write('<script type="text/javascript" src="http://code.jquery.com/jquery-1.8.3.min.js"></script>')
+	RESULT.write('<script type="text/javascript" src="/static/jquery.tablesorter.min.js"></script>')
+	RESULT.write('<script type="text/javascript">')
+	RESULT.write('jQuery(document).ready(function()')
+	RESULT.write('{') 
+	RESULT.write('jQuery("#resultTable").tablesorter({')
+	RESULT.write('widthFixed: true,')
+	RESULT.write("widgets: ['zebra']")
+	RESULT.write('}')
+	RESULT.write(');') 
+	RESULT.write('}') 
+	RESULT.write(');') 
+	RESULT.write('</script>')
+	
 	RESULT.write('</head>')
 	RESULT.write('<body>')
 	
 def createTableHeader():
-	RESULT.write('<table border=1>')
+	RESULT.write('<table id="resultTable" class="tablesorter">')
+	RESULT.write('<thead>')
 	RESULT.write('<tr>')
 	RESULT.write('<th>mac</th>')
 	RESULT.write('<th>ip</th>')
@@ -473,8 +488,11 @@ def createTableHeader():
 	RESULT.write('<th>docsIfCmStatusT3Timeouts</th>')
 	RESULT.write('<th>docsIfCmStatusT4Timeouts</th>')
 	RESULT.write('</tr>')
+	RESULT.write('</thead>')
+	RESULT.write('<tbody>')
 	
 def createHTMLFooter():
+	RESULT.write('</body>')
 	RESULT.write('</table>')
 	RESULT.write('</body>')
 	RESULT.write('</html>')
