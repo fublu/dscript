@@ -1,8 +1,8 @@
 #!/usr/bin/python
 """
-	Version:	0.1.1 - New Concept using webpy and ajax instead of plain old cgi 
+	Version:	0.1 - Beta
 	Author:		Memleak13
-	Date:		09.05.13 - 12:00
+	Date:		25.05.13
 """
 
 import re
@@ -13,34 +13,89 @@ import json
 from pysnmp.entity.rfc3413.oneliner import cmdgen
 
 class Cmts(object):
+	"""Represents a cmts.
+	
+	It is identified by its name and IP address.
+	It contains the macdomain domain which includes the requsted modems.
+	It creates a telnet object when initilized. The telnet object is 
+	used to access the cmts and run commands. The session stays open until the 
+	object is destroyed.
+	"""
+	
 	def __init__(self, ip, name):
+		"""Inits cmts with ip, name and telnet object.
+		
+		Args:
+			ip: ip address
+			name: well ... 
+		"""
 		self.ip = ip
 		self.name = name
-		self.macdomains = '' #a list of all macdomain objects, as there is only one right now, it is a string
-		self.tn = TelnetAccess(self.ip, IOS_UID, IOS_PW) # creates a telnet obj and logs into cmts stays logged in
+		self.tn = TelnetAccess(self.ip, IOS_UID, IOS_PW) 
     
 	def createMacDomain(self, iface):
+		"""Creates and stores the mac domain.
+		
+		See MacDomain class.
+		
+		Args:
+			iface: the macdomain selected by the user
+		"""
 		self.macdomains  = MacDomain(iface)
 
 	def getCMs(self):
+		"""Retrieves all modems in the specified macdomain
+		
+		By running the ios command "show cable modem cable [macdomain]"
+		The output is written into the file telnetoutput
+		"""
 		self.tn.runCommand('show cable modem cable ' + str(self.macdomains.name))
 
 	def getCMverbose(self, cmmac):
+		"""Retroves values for a specific cable modem.
+		
+		By running the ios comand "show cable modem [mac] verbose.
+		The output is written into the file telnetoutput
+		
+		Args:
+			cmmac: mac address of the cable modem
+		"""
 		self.tn.runCommand('show cable modem ' + cmmac + ' verbose')
-		#print ('show cable modem ' + cmmac + ' verbose')
 
 	def __del__(self):
+		"""Closes and deletes the telnet connection"""
 		self.tn.closeTN() 	# close telnet connection
 		del self.tn 		# delete object
 
-
 class MacDomain(object):
+	"""Represents the mac domain.
+	
+	Identified by its name (the macdomain selected by the user).
+	It contains a list of all cable modems in this domain by filtering
+	the cmts output. 
+	"""
+		
 	def __init__(self, name):
+		"""Inits the macdomain
+		
+		Args:
+			name: chosen mac domain
+		"""
 		self.name = name
 
 	def extractData(self):
-		#Step 2.1:  #Reading and filtering the cmts output to include only modems
-		#by deleteing first 4 and last 2 lines, file is stored in cleanedlist
+		"""Extracts and filters modem values.
+		
+		Filters the cmts output to contain just modems.
+		Creates a modem object where it stores US and DS information for each 
+		modem by retrieving the data from the cmts(US) over telnet and from the 
+		cable modem over snmp(DS). Finally it writes this data into an html 
+		file (result.html).
+		
+		Refers to step 2.1 - 2.5
+		"""
+		
+		#Step 2.1: Reading and filtering the cmts output to include only modems
 		fin = open('/home/tbsadmin/projects/dscript/static/telnetoutput', 'r')
 		cleanedlist = []
 		for line in fin: 
@@ -51,55 +106,51 @@ class MacDomain(object):
 		global CM_TOTAL
 		CM_TOTAL = len(cleanedlist)
 		fin.close()
-		#print ('Total modems on card: %d' % self.cmtotal)
-	
-		"""
-		#Step 2.2 : - Line by line the cleanedlist is splitted into its values
-					- Modem is then created with these inital values. After data has been written added and written into the file, this object
-					  is then deleted (to clear all values).	
-		"""
+		
+		#Step 2.2: Modem object is created with initial values.
 		cmdatafromcmts = []
 		for line in cleanedlist:
 			modem = Modem() 
 			del cmdatafromcmts[:]
 			cmdatafromcmts = line.split()
-			
 			modem.mac = cmdatafromcmts[0].strip()
 			modem.ip = cmdatafromcmts[1].strip()
 			modem.iface = cmdatafromcmts[2].strip()
 			modem.state = cmdatafromcmts[3].strip()
 			modem.rxpwr = cmdatafromcmts[5].strip()
 			
-			print "Modem Mac: " + cmdatafromcmts[0]
-
-			#Step 2.3 : - Telneting to cmts, running verbose command, storing output in telnetoutput
-			#           - Filtering verbose values and adding them to created modem object   
+			#Step 2.3: Setting US and other values retrieved from the cmts
 			ubr01shr.getCMverbose(cmdatafromcmts[0])
 			modem.setUSData()
 		
-			#Step 2.4 : - Gathering CM DS Data by SNMP and storing them in created modem object
+			#Step 2.4: Setting DS data retrieved from the modem
 			modem.setDSData()
 
-			#Step 2.5: writing <tr> with all the modem values into ./result.html, the returned file by AJAX
+			#Step 2.5: Writting html ouptut 
+			#TODO: #15 - D1 Data
+			#TODO: #5 - Multiple Data			
 			if 'DOC3.0' in modem.macversion:
 				self.writeD3data(modem)
 			else:
 				self.writeD2data(modem)
-			# !DEBUG: ISSUE 5.2 setting a timeout. This should give the app enough time to write the complete data into the file
-			# time.sleep(2)
 			global CM_COUNT
 			CM_COUNT+=1
 			writeState();
 			del modem
 	
 	def writeD3data(self, modem):
+		"""Writes D3 values into html file.
+		
+		Args:
+			modem: docsis 3 modem
+		"""
 		RESULT.write('<tr>')
 		RESULT.write('<td>' + modem.mac + '</td>')
 		RESULT.write('<td>' + modem.ip + '</td>')
 		RESULT.write('<td>' + modem.iface + '</td>')
 		RESULT.write('<td>' + modem.state + '</td>')
 		RESULT.write('<td>' + modem.rxpwr + '</td>')
-		
+		#US 
 		for value in modem.macversion:
 			RESULT.write('<td>' + value + '</td>')
 		for value in modem.upsnr:
@@ -120,7 +171,7 @@ class MacDomain(object):
 			RESULT.write('<td>' + value + '</td>')
 		for value in modem.reason:
 			RESULT.write('<td>' + value + '</td>')
-			
+		#DS	
 		for value in modem.docsIfDownChannelPower:
 			RESULT.write('<td>' + value + '</td>')
 		for value in modem.docsIfSigQSignalNoise:
@@ -136,14 +187,19 @@ class MacDomain(object):
 		for value in modem.docsIfCmStatusT3Timeouts:
 			RESULT.write('<td>' + value + '</td>')
 		for value in modem.docsIfCmStatusT4Timeouts:
-			RESULT.write('<td>' + value + '</td>')
-		
+			RESULT.write('<td>' + value + '</td>')		
 		RESULT.write('</tr>')
 		
 	def writeD2data(self, modem):
-	
-		#First empty cells need to be created in the lists, so D3 and D2 Values can be displayed in the same table
-		#Upstream 
+		"""Writes D2 values into html file.
+		
+		Empty cells for D3 bonded values need to be created to display D2 and 
+		D3 modems in the same table.
+		
+		Args:
+			modem: D2 modem
+		"""
+		#Empty US
 		modem.upsnr.append('-')
 		modem.receivedpwr.append('-')
 		modem.reportedtransmitpwr.append('-')
@@ -152,8 +208,7 @@ class MacDomain(object):
 		modem.toff.insert(3,'-')
 		modem.uncorrectables.append('-')
 		modem.reason.append('-')
-		
-		#Downstream
+		#Empty DS
 		modem.docsIfDownChannelPower.append('-')
 		modem.docsIfDownChannelPower.append('-')
 		modem.docsIfDownChannelPower.append('-')
@@ -166,16 +221,14 @@ class MacDomain(object):
 		modem.docsIfSigQMicroreflections.append('-')
 		modem.docsIfSigQMicroreflections.append('-')
 		modem.docsIfSigQMicroreflections.append('-')
-		
-		#Writing table row
+		#Write
 		RESULT.write('<tr>')
 		RESULT.write('<td>' + modem.mac + '</td>')
 		RESULT.write('<td>' + modem.ip + '</td>')
 		RESULT.write('<td>' + modem.iface + '</td>')
 		RESULT.write('<td>' + modem.state + '</td>')
 		RESULT.write('<td>' + modem.rxpwr + '</td>')
-		
-		#Upstream
+		#US
 		for value in modem.macversion:
 			RESULT.write('<td>' + value + '</td>')
 		for value in modem.upsnr:
@@ -195,9 +248,8 @@ class MacDomain(object):
 		for value in modem.errors:
 			RESULT.write('<td>' + value + '</td>')
 		for value in modem.reason:
-			RESULT.write('<td>' + value + '</td>')
-			
-		#Downstream
+			RESULT.write('<td>' + value + '</td>')		
+		#DS
 		for value in modem.docsIfDownChannelPower:
 			RESULT.write('<td>' + value + '</td>')
 		for value in modem.docsIfSigQSignalNoise:
@@ -213,16 +265,24 @@ class MacDomain(object):
 		for value in modem.docsIfCmStatusT3Timeouts:
 			RESULT.write('<td>' + value + '</td>')
 		for value in modem.docsIfCmStatusT4Timeouts:
-			RESULT.write('<td>' + value + '</td>')
-			
+			RESULT.write('<td>' + value + '</td>')		
 		RESULT.write('</tr>')
 		
 
 class Modem(object):
+	"""Represents the modem.
+	
+	Includes all docis values retreived by the cmts or modem.
+	Connects to the modem using snmp.
+	"""
+	
 	snmpcommunity = 'web4suhr'
 	def __init__(self):
-		#To keep things simple, I created list for all attributes
-		#but the initial ones. Even if they only take one attribute
+		"""Inits modem setting all attributes to empty values
+		
+		To keep things simple, I created lists for all attributes except the
+		initial ones. Even if they only take one attribute.
+		"""
 		self.mac = ''
 		self.ip = ''
 		self.iface = ''
@@ -248,60 +308,50 @@ class Modem(object):
 		self.docsIfCmStatusT3Timeouts = []
 		self.docsIfCmStatusT4Timeouts = []
     
-	#Setting data gathered from cmts verbose, flaps, erros and dspwr are strings
 	def setUSData(self):
+		"""Sets US Data"""
 		fin = open('/home/tbsadmin/projects/dscript/static/telnetoutput', 'r')
 		for line in fin:
-			#each line is checked for the expression, the splitted into values, first ":" as perimeter,
-			#then to seperate multiple values (Bondend), it is splitted again with " "
 			if 'MAC Version' in line:
 				value = line.split(':')
+				#Line needs to be split again in case of multiple values(bonded)
 				value = value[1].split()
 				for index in value:
 					self.macversion.append(index.strip())
-
 			elif 'Upstream SNR' in line:
 				value = line.split(':')
 				value = value[1].split()
 				for index in value:
 					self.upsnr.append(index.strip())
-
 			elif 'Received Power' in line:
 				value = line.split(':')
 				value = value[1].split()
 				for index in value:
 					self.receivedpwr.append(index.strip())
-
 			elif 'Reported Transmit Power' in line:
 				value = line.split(':')
 				value = value[1].split()
 				for index in value:
 					self.reportedtransmitpwr.append(index.strip())
-
 			elif 'Downstream Power' in line:
 				value = line.split(':')
 				self.dspwr.append(value[1].strip())
-
 			elif 'Timing Offset' in line:
 				value = line.split(':')
 				value = value[1].split()
 				for index in value:
 					self.toff.append(index.strip())
-
 			elif 'Uncorrectable Codewords' in line:
 				value = line.split(':')
 				value = value[1].split()
 				for index in value:
 					self.uncorrectables.append(index.strip())
-
 			elif 'Flaps' in line:
 				value = line.split(':')
 				self.flaps.append(value[1].strip())
-
 			elif 'Errors' in line:
 				value = line.split(':')
 				self.errors.append(value[1].strip())
-
 			elif 'CM Initialization Reason' in line:
 				value = line.split(':')
 				value = value[1].split()
@@ -309,16 +359,11 @@ class Modem(object):
 					self.reason.append(index.strip())
 		fin.close()
 
-	#Setting data gathered from CM by SNMP
-	#TEST: The values needs to be checked as dictionaries are generally unsorted!
 	def setDSData(self):
+		"""Sets DS Data."""
 		if 'online' in self.state:
-			#CM_ONLINE counts the amount of online modems snmp requests are sent to 
-			#this will then be displayed as soon as script finishes
 			global CM_ONLINE
-			CM_ONLINE += 1
-			
-			# !DEBUG: Disable SNMP						
+			CM_ONLINE += 1					
 			receivedsnmpvalues = self.getsnmp()
 			for mib, snmpvalue in sorted(receivedsnmpvalues.iteritems()):
 				if 'docsIfDownChannelPower' in mib:
@@ -339,6 +384,11 @@ class Modem(object):
 					self.docsIfCmStatusT4Timeouts.append(snmpvalue)
 	
 	def getsnmp(self):
+		"""Connects to modem using SNMP.
+		
+		Returns: snmpvalue, a dictionary mapping mib to its corresponding
+			value.
+		"""
 		snmpvalue = {}  #dictionary which will be returned
 		cmdGen = cmdgen.CommandGenerator()
 		errorIndication, errorStatus, errorIndex, varBindTable = cmdGen.nextCmd(
@@ -358,7 +408,6 @@ class Modem(object):
 			#cmdgen.MibVariable('DOCS-IF-MIB', 'docsIfCmStatusInvalidMaps'),
 			lookupNames=True, lookupValues=True
 			)
-
 		if errorIndication:
 			print(errorIndication)
 		else:
@@ -373,56 +422,69 @@ class Modem(object):
 					for name, val in varBindTableRow:
 						snmpvalue[name.prettyPrint()] = val.prettyPrint()
 		#print('%s = %s' % (name.prettyPrint(), val.prettyPrint()))
-		#snmpvalue.append(val.prettyPrint())
-		#print snmpvalue
 		return snmpvalue
 
 class TelnetAccess(object):
-	# Defining regular expressions for the different prompts here
+	"""Creates and establishes a telnet session."""
+	
+	# Defining regular expressions for the different prompts
 	ios_unprivPrompt = re.compile ('.*>')
 	ios_privPrompt = re.compile ('.*#')
-	regexlist = [ios_unprivPrompt, ios_privPrompt, 'Username:', 'Password:', 'username:', 'password:']
-
+	regexlist = [ios_unprivPrompt, ios_privPrompt, 'Username:', 'Password:', 
+				 'username:', 'password:']
+	
 	def __init__(self, ip, uid, password):
+		"""Inits the telnet session and connects to the device.
+		
+		Args:
+			ip: ip address
+			uid: user id
+			password: well ... 
+		"""
 		self.ip = ip
 		self.uid = uid
 		self.password = password
 		self.telnetoutput = ''
-
-		#Connecting to host
-		self.tn = telnetlib.Telnet(self.ip)
-
+		self.tn = telnetlib.Telnet(self.ip) #Connect
 		#IOS Login prodedure (unpriv -> enable -> priv)
-		self.tn.expect(TelnetAccess.regexlist) #regexlist is global
+		self.tn.expect(TelnetAccess.regexlist)
 		self.tn.write(self.uid + "\n")
 		self.tn.expect(TelnetAccess.regexlist)
 		self.tn.write(self.password + "\n")
 		self.tn.expect(TelnetAccess.regexlist)
-		#time.sleep(1) #Setting a delay, otherwise prg. execution to fast and command is run before telnet obj is init.
 
 	def runCommand(self,command):
-		#Opening filehandle
-		self.telnetoutput = open('/home/tbsadmin/projects/dscript/static/telnetoutput', 'w')		
-		#Executing command and returning output
-		#self.tn.expect(TelnetAccess.regexlist)
+		"""Runs a command on a device connected by telnet.
+		
+		Writes the output into a file
+		
+		Args:
+			command: whatever could this stand for ...
+		"""
+		self.telnetoutput = open(
+			'/home/tbsadmin/projects/dscript/static/telnetoutput', 'w')		
 		self.tn.write(command + "\n")
-		# !DEBUG: ISSUE 5.1 - Setting Timeout from 0.3 to 0.75 s, giving the app enought time to write the commands output
+		#TODO: #5 - Multiple Data, seems by setting a higher sleep value the
+		#issue does not occur as often.
 		time.sleep(0.75) 
 		output = self.tn.read_very_eager()
 		self.telnetoutput.write(output)
-
-		#Close filehandle
 		self.telnetoutput.close()
 
 	def closeTN(self):
+		"""Closes connection"""
 		self.tn.close()
 
-
 def createHTMLHeader():
+	"""Writes HTML Header
+	
+		The header contains some javascript to include tablesort 2.0
+		http://tablesorter.com
+	"""
+	
 	RESULT.write('<!DOCTYPE HTML>')
 	RESULT.write('<html>')
-	RESULT.write('<head>')
-	
+	RESULT.write('<head>')	
 	RESULT.write('<link rel="stylesheet" href="/static/themes/blue/style.css" />')
 	RESULT.write('<script type="text/javascript" src="http://code.jquery.com/jquery-1.8.3.min.js"></script>')
 	RESULT.write('<script type="text/javascript" src="/static/jquery.tablesorter.min.js"></script>')
@@ -436,12 +498,13 @@ def createHTMLHeader():
 	RESULT.write(');') 
 	RESULT.write('}') 
 	RESULT.write(');') 
-	RESULT.write('</script>')
-	
+	RESULT.write('</script>')	
 	RESULT.write('</head>')
 	RESULT.write('<body>')
 	
 def createTableHeader():
+	"""Writes HTML table header"""
+	
 	RESULT.write('<table id="resultTable" class="tablesorter">')
 	RESULT.write('<thead>')
 	RESULT.write('<tr>')
@@ -492,19 +555,25 @@ def createTableHeader():
 	RESULT.write('<tbody>')
 	
 def createHTMLFooter():
+	"""Writes HTML footer"""
+	
 	RESULT.write('</body>')
 	RESULT.write('</table>')
 	RESULT.write('</body>')
 	RESULT.write('</html>')
 		
-
-#Writes the counter and running state into the status file which is read by ajax
-def writeState(): #writes the modem and runstatus of the app into a file. This file serves as a counter for ajax
-	data = {'CM_TOTAL' : CM_TOTAL, 'CM_COUNT': CM_COUNT, 'CM_ONLINE' : CM_ONLINE, 'RUN_STATE' : RUN_STATE}
-	STATUS.seek(0)	#move to beginning of file
+def writeState(): 
+	"""Writes stats into file
+	
+	These stats serve as a modem counter and includes the running state  of the
+	script.
+	"""
+	data = {'CM_TOTAL' : CM_TOTAL, 'CM_COUNT': CM_COUNT, 
+			'CM_ONLINE' : CM_ONLINE, 'RUN_STATE' : RUN_STATE}
+	STATUS.seek(0)
 	STATUS.write(json.dumps(data))
 
-# !MAIN
+#TODO: Add following to main() 
 
 RUN_STATE = 1	#states if the script is running (0=no, 1=yes)
 CM_TOTAL = ''	#holds all CM in macdomain
@@ -512,44 +581,25 @@ CM_COUNT = 0	#holds number of processed modems
 CM_ONLINE = 0	#this counter counts only online modems
 IOS_UID = 'dscript'
 IOS_PW = 'hf4ev671'
-RESULT = open('/home/tbsadmin/projects/dscript/static/result.html', 'w')	#Holds the file which will be returned by ajax
-STATUS = open('/home/tbsadmin/projects/dscript/static/status', 'w')			#holds counter values and runstate
-#DEBUG = open('/home/tbsadmin/projects/dscript/static/debug', 'w')
-
-"""
-Step 1: Create CMTS Object, telnet cmts and login, issue command, receive cm list
-		Just to test this script the mac domain is entered manually into this script
-"""
-
-# 1.1 - Creating html and table header 
+STATUS = open('/home/tbsadmin/projects/dscript/static/status', 'w') #Stats
+RESULT = open('/home/tbsadmin/projects/dscript/static/result.html', 'w') #Html
 createHTMLHeader()
 createTableHeader()
 
-# 1.2 - Receiving argv value, telneting to cmts 
+#Step 1.1 - Receiving argv(mac domain), create cmts, macdomain etc...
 argv = str(sys.argv[1])
-
 ubr01shr = Cmts('10.10.10.50', 'ubr01shr')
-
 ubr01shr.createMacDomain(argv)
-
 ubr01shr.getCMs()
 
-""" Step 2 (2.1 - 2.5):	- Extract Data from cm list (telnet output from cmts)
-						- Create Modem Object
-						- Populate CM values from CMTS and CM (SNMP)
-						- Add all CMs to macdomain.clist	 
-"""
-
+#Step 2.1 - 2.5: Retrieve, filter data
 ubr01shr.macdomains.extractData()	 
- 	
-"""
-#Step 3 - Creating HTML footer and cleaning up
-"""
-createHTMLFooter()
 
-#Cleaning up
-del ubr01shr
+#Step 3 - Finishing
+createHTMLFooter()
 RUN_STATE=0
 writeState()
 STATUS.close()
 RESULT.close()
+del ubr01shr
+
