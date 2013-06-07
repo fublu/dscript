@@ -124,15 +124,19 @@ class MacDomain(object):
 			modem.setUSData()
 		
 			#Step 2.4: Setting DS data retrieved from the modem
-			modem.setDSData()
+			if 'DOC3.0' in modem.macversion or 'DOC2.0' in modem.macversion:
+				modem.setDSData()
 
 			#Step 2.5: Writting html ouptut 
 			#TODO: #15 - D1 Data
 			#TODO: #5 - Multiple Data			
 			if 'DOC3.0' in modem.macversion:
 				self.writeD3data(modem)
-			else:
+			elif 'DOC2.0' in modem.macversion:
 				self.writeD2data(modem)
+			else:
+				self.writeD1data(modem)
+
 			global CM_COUNT
 			CM_COUNT+=1
 			writeState();
@@ -267,8 +271,27 @@ class MacDomain(object):
 		for value in modem.docsIfCmStatusT4Timeouts:
 			RESULT.write('<td>' + value + '</td>')		
 		RESULT.write('</tr>')
-		
 
+	def writeD1data(self, modem):
+		"""Writes D1 values into html file.
+		
+		For the moment only basic values (mac, ip, iface, state, rxpwr, Docsis)
+		are written into a file.
+		For the momemnt I disabled SNMP Values from D1 Modems - Slow response
+		
+		Args:
+			modem: D1 modem
+		"""
+		RESULT.write('<tr>')
+		RESULT.write('<td>' + modem.mac + '</td>')
+		RESULT.write('<td>' + modem.ip + '</td>')
+		RESULT.write('<td>' + modem.iface + '</td>')
+		RESULT.write('<td>' + modem.state + '</td>')
+		RESULT.write('<td>' + modem.rxpwr + '</td>')
+		RESULT.write('<td>' + modem.macversion[0] + '</td>')
+		RESULT.write('</tr>')
+
+		
 class Modem(object):
 	"""Represents the modem.
 	
