@@ -7,7 +7,8 @@
 
 import re
 import sys
-import time        
+import time 
+#import datetime      
 import telnetlib
 import json
 from pysnmp.entity.rfc3413.oneliner import cmdgen
@@ -27,11 +28,11 @@ class Cmts(object):
 		
 		Args:
 			ip: ip address
-			name: well ... 
+			name: the name of the device, also used for the telnet prompt
 		"""
 		self.ip = ip
 		self.name = name
-		self.tn = TelnetAccess(self.ip, IOS_UID, IOS_PW) 
+		self.tn = TelnetAccess(self.ip, self.name, IOS_UID, IOS_PW) 
     
 	def createMacDomain(self, iface):
 		"""Creates and stores the mac domain.
@@ -123,10 +124,11 @@ class MacDomain(object):
 			ubr01shr.getCMverbose(cmdatafromcmts[0])
 			modem.setUSData()
 		
-			#Step 2.4: Setting DS data retrieved from the modem
+			#Step 2.4: 	Setting DS data retrieved from the modem 
+			# 			except (D1 Modems)
 			if 'DOC3.0' in modem.macversion or 'DOC2.0' in modem.macversion:
 				modem.setDSData()
-
+				
 			#Step 2.5: Writting html ouptut 
 			#TODO: #15 - D1 Data
 			#TODO: #5 - Multiple Data			
@@ -277,7 +279,7 @@ class MacDomain(object):
 		
 		For the moment only basic values (mac, ip, iface, state, rxpwr, Docsis)
 		are written into a file.
-		For the momemnt I disabled SNMP Values from D1 Modems - Slow response
+		For the momemnt SNMP Values from D1 Modems are disabled - Slow response
 		
 		Args:
 			modem: D1 modem
@@ -456,7 +458,7 @@ class TelnetAccess(object):
 	regexlist = [ios_unprivPrompt, ios_privPrompt, 'Username:', 'Password:', 
 				 'username:', 'password:']
 	
-	def __init__(self, ip, uid, password):
+	def __init__(self, ip, name, uid, password):
 		"""Inits the telnet session and connects to the device.
 		
 		Args:
@@ -465,6 +467,7 @@ class TelnetAccess(object):
 			password: well ... 
 		"""
 		self.ip = ip
+		self.prompt = name + '#' #read_until prompt (ex. ubr01SHR#)
 		self.uid = uid
 		self.password = password
 		self.telnetoutput = ''
@@ -487,15 +490,12 @@ class TelnetAccess(object):
 		self.telnetoutput = open(
 			'/home/tbsadmin/projects/dscript/static/telnetoutput', 'w')		
 		self.tn.write(command + "\n")
-		#TODO: #5 - Multiple Data, seems by setting a higher sleep value the
-		#issue does not occur as often.
-		time.sleep(0.75) 
-		output = self.tn.read_very_eager()
+		output = self.tn.read_until(self.prompt)
 		self.telnetoutput.write(output)
 		self.telnetoutput.close()
 
 	def closeTN(self):
-		"""Closes connection"""
+		"""Close connection"""
 		self.tn.close()
 
 def createHTMLHeader():
@@ -611,7 +611,7 @@ createTableHeader()
 
 #Step 1.1 - Receiving argv(mac domain), create cmts, macdomain etc...
 argv = str(sys.argv[1])
-ubr01shr = Cmts('10.10.10.50', 'ubr01shr')
+ubr01shr = Cmts('10.10.10.50', 'ubr01SHR')
 ubr01shr.createMacDomain(argv)
 ubr01shr.getCMs()
 
