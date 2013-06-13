@@ -1,7 +1,7 @@
 """
 	Version:	0.1 - Beta
 	Author:		Memleak13
-	Date:		25.05.13
+	Date:		13.06.13
 
 	This is the main module which is initilized by Apache.
 	Permissions must be set correctly, all files will be created with 
@@ -41,19 +41,23 @@ class runscript:
 		
 		Checks if status file exists and if the script is already running.
 		"""
-		getInput = web.input(macdomain=None)
+		#Get get arguments
+		argv = web.input()
+		macdomain = argv.macdomain
+		topology = argv.topology
+
 		try:
 			fh_status = open('/var/www/dscript/static/status')
 			data = json.loads(fh_status.read())
 			if data['RUN_STATE'] is 1:
 				return (1)
 			else:
-				os.system('/var/www/dscript/dscript.py %s &' 
-						  % getInput.macdomain)
+				os.system('/var/www/dscript/dscript.py %s %s &' 
+						  % (macdomain, topology))
 		#Throw exception if file does not exist and runs dscript.py. dscript
 		#creates the file.
 		except:
-			os.system('/var/www/dscript/dscript.py %s &' % getInput.macdomain)
+			os.system('/var/www/dscript/dscript.py %s %s &' % (macdomain, topology))
 
 class counter:
 	"""Returns run state and counter"""

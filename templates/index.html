@@ -88,10 +88,19 @@ $def with ()
 					jQuery("#status").timer('stop');
 					
 					//Getting the selected value (ex 5/1/0)
-					var macdomain = jQuery("select").val();
-					
+					var selectValue = jQuery("select").val();
+					var macAndTop = selectValue.split("|");
+					var macdomain = macAndTop[0];
+					var topology = macAndTop[1];
+
 					//First Ajax request - Run the script 
-					jQuery.ajax({url: "http://dscript.ziknet.ch/runscript", data: {macdomain: macdomain}}) // {description:var}
+					jQuery.ajax({
+						url: "http://dscript.ziknet.ch/runscript", 
+						data: {
+							macdomain: macdomain,
+							topology: topology
+						}
+					}) // {description:var}
 					.done(function(response) {
 						//console.log("Debug: AJAX - Script has been started successfully");
 						//console.log("Debug: Starting Timer");
@@ -119,21 +128,32 @@ $def with ()
 			<tr>
 				<td colspadn="2">
 					<select>
-						<option value="5/0/0">C5/0/0</option>     
-						<option value="5/0/1">C5/0/1</option>     
-						<option value="5/0/2">C5/0/2</option>     
-						<option value="5/0/3">C5/0/3</option>        
-						<option value="5/0/4">C5/0/4</option>           
-						<option value="5/1/0">C5/1/0</option>            
-						<option value="5/1/1">C5/1/1</option>            
-						<option value="5/1/2">C5/1/2</option>            
-						<option value="5/1/3">C5/1/3</option>            
-						<option value="5/1/4">C5/1/4</option>            
-						<option value="6/1/0">C6/1/0</option>            
-						<option value="6/1/1">C6/1/1</option>                
-						<option value="6/1/2">C6/1/2</option>             
-						<option value="6/1/3">C6/1/3</option>           
-						<option value="6/1/4">C6/1/4</option>
+						<!--
+						HFC topology:
+						1. 1 USG (2x bonded), 1 DSG (4x bonded) => 1214
+						2. 2 USG (2x bonded), 1 DSG (4x bonded) => 2214
+						3. 1 USG (3x bonded), 1 DSG (4x bonded) => 1314
+						4. 1 USG (3x bonded), 2 DSG (4x bonded) => 1324
+						-->
+						<option value="5/0/0|2214">C5/0/0 - Reinach 1,2    </option>     
+						<option value="5/0/1|2214">C5/0/1 - Reinach 3,4    </option>     
+						<option value="5/0/2|2214">C5/0/2 - Schöftland 1,2 </option>     
+						<option value="5/0/3|2214">C5/0/3 - Schöftland 3,4 </option>        
+						<option value="5/0/4|2214">C5/0/4 - Zetzwil,Gonten.</option>           
+						<option value="5/1/0|1214">C5/1/0 - Suhr 1, TBS    </option>            
+						<option value="5/1/1|1214">C5/1/1 - Suhr 2, Bärenm.</option>            
+						<option value="5/1/2|1324">C5/1/2 - Suhr 3, Messst.</option>            
+						<option value="5/1/3|1324">C5/1/3 - Suhr 4, August.</option>            
+						<option value="5/1/4|1324">C5/1/4 - Suhr 5, Fliede.</option> 
+						<option value="5/1/5|1324">C5/1/5 - Suhr 6, Bachst.</option>
+						<option value="5/1/5|1314">C5/1/7 - Suhr 7, Lab    </option>            
+						<option value="6/1/0|1324">C6/1/0 - Teufenthal 1,2 </option>            
+						<option value="6/1/1|1324">C6/1/1 - Unterkulm 1,2  </option>                
+						<option value="6/1/2|1214">C6/1/2 - Gränichen 1    </option>             
+						<option value="6/1/3|1314">C6/1/3 - Gränichen 2    </option>           
+						<option value="6/1/4|1324">C6/1/4 - Gränichen Ost  </option>
+						<option value="6/1/5|1314">C6/1/5 - Muhen 1        </option>
+						<option value="6/1/6|1314">C6/1/6 - Muhen 2        </option>
 					</select>
 					<button>Go</button>
 				</td>
@@ -142,7 +162,7 @@ $def with ()
 				<td colspan="2"><div id="status"><a href="/static/result.html">Letzte Abfrage</div></td>
 			</tr>
 		</table>
-		<div id="impressum"> Developed by Teletrend AG (JM) for Technische Betriebe Suhr - Version 0.1 Beta(05.2013)</div>
+		<div id="impressum"> Developed by Teletrend AG for Technische Betriebe Suhr - Version 0.1 Beta(05.2013)</div>
 		<div id="result"></div>
 	</body>
 </html>
