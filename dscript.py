@@ -2,9 +2,12 @@
 """
 	Version:	0.1 - Beta
 	Author:		Memleak13
-	Date:		25.05.13
+	Date:		13.06.13
 """
+#My modules
+from table import Table
 
+#Other modules
 import re
 import sys
 import time 
@@ -12,6 +15,7 @@ import time
 import telnetlib
 import json
 from pysnmp.entity.rfc3413.oneliner import cmdgen
+
 
 class Cmts(object):
 	"""Represents a cmts.
@@ -80,9 +84,11 @@ class MacDomain(object):
 		"""Inits the macdomain
 		
 		Args:
-			name: chosen mac domain
+			name: represents the mac domain (ex. c5/1/0)
 		"""
 		self.name = name
+		#TODO: 1x2 is only a placeholder until topology is implemented
+		self.table = Table('1x2') 
 
 	def extractData(self):
 		"""Extracts and filters modem values.
@@ -130,170 +136,20 @@ class MacDomain(object):
 				modem.setDSData()
 				
 			#Step 2.5: Writting html ouptut 
-			#TODO: #15 - D1 Data
-			#TODO: #5 - Multiple Data			
 			if 'DOC3.0' in modem.macversion:
-				self.writeD3data(modem)
+				self.table.adjust_4_d3(modem)
+			
 			elif 'DOC2.0' in modem.macversion:
-				self.writeD2data(modem)
+				self.table.adjust_4_d2(modem)
+			
 			else:
-				self.writeD1data(modem)
+				self.table.adjust_4_d1(modem)
 
 			global CM_COUNT
 			CM_COUNT+=1
 			writeState();
 			del modem
 	
-	def writeD3data(self, modem):
-		"""Writes D3 values into html file.
-		
-		Args:
-			modem: docsis 3 modem
-		"""
-		RESULT.write('<tr>')
-		RESULT.write('<td>' + modem.mac + '</td>')
-		RESULT.write('<td>' + modem.ip + '</td>')
-		RESULT.write('<td>' + modem.iface + '</td>')
-		RESULT.write('<td>' + modem.state + '</td>')
-		RESULT.write('<td>' + modem.rxpwr + '</td>')
-		#US 
-		for value in modem.macversion:
-			RESULT.write('<td>' + value + '</td>')
-		for value in modem.upsnr:
-			RESULT.write('<td>' + value + '</td>')
-		for value in modem.receivedpwr:
-			RESULT.write('<td>' + value + '</td>')
-		for value in modem.reportedtransmitpwr:
-			RESULT.write('<td>' + value + '</td>')
-		for value in modem.dspwr:
-			RESULT.write('<td>' + value + '</td>')
-		for value in modem.toff:
-			RESULT.write('<td>' + value + '</td>')
-		for value in modem.uncorrectables:
-			RESULT.write('<td>' + value + '</td>')
-		for value in modem.flaps:
-			RESULT.write('<td>' + value + '</td>')
-		for value in modem.errors:
-			RESULT.write('<td>' + value + '</td>')
-		for value in modem.reason:
-			RESULT.write('<td>' + value + '</td>')
-		#DS	
-		for value in modem.docsIfDownChannelPower:
-			RESULT.write('<td>' + value + '</td>')
-		for value in modem.docsIfSigQSignalNoise:
-			RESULT.write('<td>' + value + '</td>')
-		for value in modem.docsIfSigQUncorrectables:
-			RESULT.write('<td>' + value + '</td>')
-		for value in modem.docsIfSigQMicroreflections:
-			RESULT.write('<td>' + value + '</td>')
-		for value in modem.docsIfCmStatusTxPower:
-			RESULT.write('<td>' + value + '</td>')
-		for value in modem.docsIfCmStatusInvalidUcds:
-			RESULT.write('<td>' + value + '</td>')
-		for value in modem.docsIfCmStatusT3Timeouts:
-			RESULT.write('<td>' + value + '</td>')
-		for value in modem.docsIfCmStatusT4Timeouts:
-			RESULT.write('<td>' + value + '</td>')		
-		RESULT.write('</tr>')
-		
-	def writeD2data(self, modem):
-		"""Writes D2 values into html file.
-		
-		Empty cells for D3 bonded values need to be created to display D2 and 
-		D3 modems in the same table.
-		
-		Args:
-			modem: D2 modem
-		"""
-		#Empty US
-		modem.upsnr.append('-')
-		modem.receivedpwr.append('-')
-		modem.reportedtransmitpwr.append('-')
-		modem.reportedtransmitpwr.append('-')
-		modem.toff.insert(1,'-')
-		modem.toff.insert(3,'-')
-		modem.uncorrectables.append('-')
-		modem.reason.append('-')
-		#Empty DS
-		modem.docsIfDownChannelPower.append('-')
-		modem.docsIfDownChannelPower.append('-')
-		modem.docsIfDownChannelPower.append('-')
-		modem.docsIfSigQSignalNoise.append('-')
-		modem.docsIfSigQSignalNoise.append('-')
-		modem.docsIfSigQSignalNoise.append('-')
-		modem.docsIfSigQUncorrectables.append('-')
-		modem.docsIfSigQUncorrectables.append('-')
-		modem.docsIfSigQUncorrectables.append('-')
-		modem.docsIfSigQMicroreflections.append('-')
-		modem.docsIfSigQMicroreflections.append('-')
-		modem.docsIfSigQMicroreflections.append('-')
-		#Write
-		RESULT.write('<tr>')
-		RESULT.write('<td>' + modem.mac + '</td>')
-		RESULT.write('<td>' + modem.ip + '</td>')
-		RESULT.write('<td>' + modem.iface + '</td>')
-		RESULT.write('<td>' + modem.state + '</td>')
-		RESULT.write('<td>' + modem.rxpwr + '</td>')
-		#US
-		for value in modem.macversion:
-			RESULT.write('<td>' + value + '</td>')
-		for value in modem.upsnr:
-			RESULT.write('<td>' + value + '</td>')
-		for value in modem.receivedpwr:
-			RESULT.write('<td>' + value + '</td>')
-		for value in modem.reportedtransmitpwr:
-			RESULT.write('<td>' + value + '</td>')	
-		for value in modem.dspwr:
-			RESULT.write('<td>' + value + '</td>')
-		for value in modem.toff:
-			RESULT.write('<td>' + value + '</td>')
-		for value in modem.uncorrectables:
-			RESULT.write('<td>' + value + '</td>')
-		for value in modem.flaps:
-			RESULT.write('<td>' + value + '</td>')	
-		for value in modem.errors:
-			RESULT.write('<td>' + value + '</td>')
-		for value in modem.reason:
-			RESULT.write('<td>' + value + '</td>')		
-		#DS
-		for value in modem.docsIfDownChannelPower:
-			RESULT.write('<td>' + value + '</td>')
-		for value in modem.docsIfSigQSignalNoise:
-			RESULT.write('<td>' + value + '</td>')
-		for value in modem.docsIfSigQUncorrectables:
-			RESULT.write('<td>' + value + '</td>')
-		for value in modem.docsIfSigQMicroreflections:
-			RESULT.write('<td>' + value + '</td>')
-		for value in modem.docsIfCmStatusTxPower:
-			RESULT.write('<td>' + value + '</td>')
-		for value in modem.docsIfCmStatusInvalidUcds:
-			RESULT.write('<td>' + value + '</td>')
-		for value in modem.docsIfCmStatusT3Timeouts:
-			RESULT.write('<td>' + value + '</td>')
-		for value in modem.docsIfCmStatusT4Timeouts:
-			RESULT.write('<td>' + value + '</td>')		
-		RESULT.write('</tr>')
-
-	def writeD1data(self, modem):
-		"""Writes D1 values into html file.
-		
-		For the moment only basic values (mac, ip, iface, state, rxpwr, Docsis)
-		are written into a file.
-		For the momemnt SNMP Values from D1 Modems are disabled - Slow response
-		
-		Args:
-			modem: D1 modem
-		"""
-		RESULT.write('<tr>')
-		RESULT.write('<td>' + modem.mac + '</td>')
-		RESULT.write('<td>' + modem.ip + '</td>')
-		RESULT.write('<td>' + modem.iface + '</td>')
-		RESULT.write('<td>' + modem.state + '</td>')
-		RESULT.write('<td>' + modem.rxpwr + '</td>')
-		RESULT.write('<td>' + modem.macversion[0] + '</td>')
-		RESULT.write('</tr>')
-
-		
 class Modem(object):
 	"""Represents the modem.
 	
@@ -497,93 +353,6 @@ class TelnetAccess(object):
 	def closeTN(self):
 		"""Close connection"""
 		self.tn.close()
-
-def createHTMLHeader():
-	"""Writes HTML Header
-	
-		The header contains some javascript to include tablesort 2.0
-		http://tablesorter.com
-	"""
-	
-	RESULT.write('<!DOCTYPE HTML>')
-	RESULT.write('<html>')
-	RESULT.write('<head>')	
-	RESULT.write('<link rel="stylesheet" href="/static/themes/blue/style.css" />')
-	RESULT.write('<script type="text/javascript" src="http://code.jquery.com/jquery-1.8.3.min.js"></script>')
-	RESULT.write('<script type="text/javascript" src="/static/jquery.tablesorter.min.js"></script>')
-	RESULT.write('<script type="text/javascript">')
-	RESULT.write('jQuery(document).ready(function()')
-	RESULT.write('{') 
-	RESULT.write('jQuery("#resultTable").tablesorter({')
-	RESULT.write('widthFixed: true,')
-	RESULT.write("widgets: ['zebra']")
-	RESULT.write('}')
-	RESULT.write(');') 
-	RESULT.write('}') 
-	RESULT.write(');') 
-	RESULT.write('</script>')	
-	RESULT.write('</head>')
-	RESULT.write('<body>')
-	
-def createTableHeader():
-	"""Writes HTML table header"""
-	
-	RESULT.write('<table id="resultTable" class="tablesorter">')
-	RESULT.write('<thead>')
-	RESULT.write('<tr>')
-	RESULT.write('<th>mac</th>')
-	RESULT.write('<th>ip</th>')
-	RESULT.write('<th>iface</th>')
-	RESULT.write('<th>state</th>')
-	RESULT.write('<th>rxpwr</th>') 
-	RESULT.write('<th>Docsis</th>')
-	RESULT.write('<th>upsnr</th>')
-	RESULT.write('<th>upsnr</th>')
-	RESULT.write('<th>receivedpwr</th>')
-	RESULT.write('<th>receivedpwr</th>')
-	RESULT.write('<th>reportedtransmitpwr</th>')
-	RESULT.write('<th>reportedtransmitpwr</th>')
-	RESULT.write('<th>dspwr</th>')
-	RESULT.write('<th>toff</th>')
-	RESULT.write('<th>toff</th>')
-	RESULT.write('<th>init toff</th>')
-	RESULT.write('<th>init toff</th>')
-	RESULT.write('<th>uncorrectables</th>')
-	RESULT.write('<th>uncorrectables</th>')
-	RESULT.write('<th>flaps</th>')
-	RESULT.write('<th>errors</th>')
-	RESULT.write('<th>reason</th>')
-	RESULT.write('<th>docsIfDownChannelPower</th>')
-	RESULT.write('<th>docsIfDownChannelPower</th>')
-	RESULT.write('<th>docsIfDownChannelPower</th>')
-	RESULT.write('<th>docsIfDownChannelPower</th>')
-	RESULT.write('<th>docsIfSigQSignalNoise</th>')
-	RESULT.write('<th>docsIfSigQSignalNoise</th>')
-	RESULT.write('<th>docsIfSigQSignalNoise</th>')
-	RESULT.write('<th>docsIfSigQSignalNoise</th>')
-	RESULT.write('<th>docsIfSigQUncorrectables</th>')
-	RESULT.write('<th>docsIfSigQUncorrectables</th>')
-	RESULT.write('<th>docsIfSigQUncorrectables</th>')
-	RESULT.write('<th>docsIfSigQUncorrectables</th>')
-	RESULT.write('<th>docsIfSigQMicroreflections</th>')
-	RESULT.write('<th>docsIfSigQMicroreflections</th>')
-	RESULT.write('<th>docsIfSigQMicroreflections</th>')
-	RESULT.write('<th>docsIfSigQMicroreflections</th>')
-	RESULT.write('<th>docsIfCmStatusTxPower</th>')
-	RESULT.write('<th>docsIfCmStatusInvalidUcds</th>')
-	RESULT.write('<th>docsIfCmStatusT3Timeouts</th>')
-	RESULT.write('<th>docsIfCmStatusT4Timeouts</th>')
-	RESULT.write('</tr>')
-	RESULT.write('</thead>')
-	RESULT.write('<tbody>')
-	
-def createHTMLFooter():
-	"""Writes HTML footer"""
-	
-	RESULT.write('</body>')
-	RESULT.write('</table>')
-	RESULT.write('</body>')
-	RESULT.write('</html>')
 		
 def writeState(): 
 	"""Writes stats into file
@@ -605,24 +374,22 @@ CM_ONLINE = 0	#this counter counts only online modems
 IOS_UID = 'dscript'
 IOS_PW = 'hf4ev671'
 STATUS = open('/home/tbsadmin/projects/dscript/static/status', 'w') #Stats
-RESULT = open('/home/tbsadmin/projects/dscript/static/result.html', 'w') #Html
-createHTMLHeader()
-createTableHeader()
 
 #Step 1.1 - Receiving argv(mac domain), create cmts, macdomain etc...
 argv = str(sys.argv[1])
-ubr01shr = Cmts('10.10.10.50', 'ubr01SHR')
+ubr01shr = Cmts('10.10.10.50', 'ubr01SHR') #Case Sensitiv, used for telnet prompt
 ubr01shr.createMacDomain(argv)
 ubr01shr.getCMs()
 
 #Step 2.1 - 2.5: Retrieve, filter data
 ubr01shr.macdomains.extractData()	 
 
-#Step 3 - Finishing
-createHTMLFooter()
+#Step 3 - Cleaning up
+ubr01shr.macdomains.table.create_html_footer()
+ubr01shr.macdomains.table.result.close()
 RUN_STATE=0
 writeState()
 STATUS.close()
-RESULT.close()
+del ubr01shr.macdomains.table
 del ubr01shr
 
