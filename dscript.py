@@ -308,9 +308,9 @@ class Modem(object):
 
 		except Exception as e:
 			DEBUG = open('/home/tbsadmin/projects/dscript/static/debug', 'a') #Debug
-			DEBUG.write(str(datetime.datetime.now()) + '\n\n')
+			DEBUG.write(str(datetime.datetime.now()) + 'SNMP ERROR\n')
 			DEBUG.write('mac: ' + self.mac + '	ip: ' + self.ip + '\n')
-			DEBUG.write('SNMP Error:\n ' + str(e) + '\n\n')
+			DEBUG.write(str(e) + '\n\n')
 			DEBUG.write(str(self.__dict__) + '\n\n')
 			DEBUG.close()
 

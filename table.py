@@ -214,7 +214,10 @@ class Table(object):
 		self.write_th('docsIfSigQSignalNoise<',4)
 		self.write_th('docsIfSigQUncorrectables',4)
 		self.write_th('docsIfSigQMicroreflections',4)
-		self.write_th('docsIfCmStatusTxPower',4)
+		self.write_th('docsIfCmStatusTxPower',1)
+		self.write_th('docsIfCmStatusInvalidUcds',1)
+		self.write_th('docsIfCmStatusT3Timeouts',1)
+		self.write_th('docsIfCmStatusT4Timeouts',1)
 
 		self.result.write('</tr>')
 		self.result.write('</thead>')
