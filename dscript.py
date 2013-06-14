@@ -11,7 +11,7 @@ from table import Table
 import re
 import sys
 import time 
-#import datetime      
+import datetime      
 import telnetlib
 import json
 from pysnmp.entity.rfc3413.oneliner import cmdgen
@@ -272,38 +272,48 @@ class Modem(object):
 			value.
 		"""
 		snmpvalue = {}  #dictionary which will be returned
-		cmdGen = cmdgen.CommandGenerator()
-		errorIndication, errorStatus, errorIndex, varBindTable = cmdGen.nextCmd(
-			cmdgen.CommunityData(Modem.snmpcommunity, mpModel=0),
-			cmdgen.UdpTransportTarget((self.ip, 161)),
-			cmdgen.MibVariable('DOCS-IF-MIB', 'docsIfDownChannelPower'),
-			cmdgen.MibVariable('DOCS-IF-MIB', 'docsIfSigQSignalNoise'),
-			cmdgen.MibVariable('DOCS-IF-MIB', 'docsIfCmStatusTxPower'),
-			cmdgen.MibVariable('DOCS-IF-MIB', 'docsIfSigQUncorrectables'),
-			cmdgen.MibVariable('DOCS-IF-MIB', 'docsIfSigQMicroreflections'),
-			cmdgen.MibVariable('DOCS-IF-MIB', 'docsIfCmStatusInvalidUcds'),
-			cmdgen.MibVariable('DOCS-IF-MIB', 'docsIfCmStatusT3Timeouts'),
-			cmdgen.MibVariable('DOCS-IF-MIB', 'docsIfCmStatusT4Timeouts'),
-			#cmdgen.MibVariable('DOCS-IF-MIB', 'docsIfCmStatusT1Timeouts'),
-			#cmdgen.MibVariable('DOCS-IF-MIB', 'docsIfCmStatusT2Timeouts'),
-			#cmdgen.MibVariable('DOCS-IF-MIB', 'docsIfUpChannelTxTimingOffset'),
-			#cmdgen.MibVariable('DOCS-IF-MIB', 'docsIfCmStatusInvalidMaps'),
-			lookupNames=True, lookupValues=True
-			)
-		if errorIndication:
-			print(errorIndication)
-		else:
-			if errorStatus:
-				print('%s at %s' % (
-						errorStatus.prettyPrint(),
-						errorIndex and varBindTable[-1][int(errorIndex)-1] or '?'
-						)
-					)
+		try:
+			cmdGen = cmdgen.CommandGenerator()
+			errorIndication, errorStatus, errorIndex, varBindTable = cmdGen.nextCmd(
+				cmdgen.CommunityData(Modem.snmpcommunity, mpModel=0),
+				cmdgen.UdpTransportTarget((self.ip, 161)),
+				cmdgen.MibVariable('DOCS-IF-MIB', 'docsIfDownChannelPower'),
+				cmdgen.MibVariable('DOCS-IF-MIB', 'docsIfSigQSignalNoise'),
+				cmdgen.MibVariable('DOCS-IF-MIB', 'docsIfCmStatusTxPower'),
+				cmdgen.MibVariable('DOCS-IF-MIB', 'docsIfSigQUncorrectables'),
+				cmdgen.MibVariable('DOCS-IF-MIB', 'docsIfSigQMicroreflections'),
+				cmdgen.MibVariable('DOCS-IF-MIB', 'docsIfCmStatusInvalidUcds'),
+				cmdgen.MibVariable('DOCS-IF-MIB', 'docsIfCmStatusT3Timeouts'),
+				cmdgen.MibVariable('DOCS-IF-MIB', 'docsIfCmStatusT4Timeouts'),
+				#cmdgen.MibVariable('DOCS-IF-MIB', 'docsIfCmStatusT1Timeouts'),
+				#cmdgen.MibVariable('DOCS-IF-MIB', 'docsIfCmStatusT2Timeouts'),
+				#cmdgen.MibVariable('DOCS-IF-MIB', 'docsIfUpChannelTxTimingOffset'),
+				#cmdgen.MibVariable('DOCS-IF-MIB', 'docsIfCmStatusInvalidMaps'),
+				lookupNames=True, lookupValues=True
+				)
+			if errorIndication:
+				print(errorIndication)
 			else:
-				for varBindTableRow in varBindTable:
-					for name, val in varBindTableRow:
-						snmpvalue[name.prettyPrint()] = val.prettyPrint()
-		#print('%s = %s' % (name.prettyPrint(), val.prettyPrint()))
+				if errorStatus:
+					print('%s at %s' % (
+							errorStatus.prettyPrint(),
+							errorIndex and varBindTable[-1][int(errorIndex)-1] or '?'
+							)
+						)
+				else:
+					for varBindTableRow in varBindTable:
+						for name, val in varBindTableRow:
+							snmpvalue[name.prettyPrint()] = val.prettyPrint()
+			#print('%s = %s' % (name.prettyPrint(), val.prettyPrint()))
+
+		except Exception as e:
+			DEBUG = open('/home/tbsadmin/projects/dscript/static/debug', 'a') #Debug
+			DEBUG.write(str(datetime.datetime.now()) + '\n\n')
+			DEBUG.write('mac: ' + self.mac + '	ip: ' + self.ip + '\n')
+			DEBUG.write('SNMP Error:\n ' + str(e) + '\n\n')
+			DEBUG.write(str(self.__dict__) + '\n\n')
+			DEBUG.close()
+
 		return snmpvalue
 
 class TelnetAccess(object):
