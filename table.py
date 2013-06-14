@@ -7,23 +7,32 @@
 class Table(object):
 	"""Represents an html table 
 	
-	This class is used to write the mac domain table containing all cable modems
-	into a file. It differs between the mac domain topology and the the docsis
-	version of the modem. Depending on the topology and the docsis version, 
-	empty cells for the modems need to be created. Otherwise it would not be 
-	possible to store all the modem in the same table.
+	This class is used to write the mac domain table containing all cable 
+	modems into an html file. It differs between the mac domain topology and 
+	the docsis version of the modem. Depending on the topology and the 
+	docsis version, empty cells for the modems need to be created to 
+	compensate for d3 bonded comlumns.
 
 	"""
 
 	def __init__(self, topology):
 		"""Sets the topology of the mac domain
 
-		Args: topology: Macdomain topology
+		index: describes how many times a 'for' loop needs to run through. 
+		This loop is responsible for creating empty cells.
+
+		Args: topology: Macdomain topology 
+						(ex. 1214 = 1USG (2xbonded), 1 DSG(4xbonded))
 		"""
-		self.topology = topology
-		self.result = open('/home/tbsadmin/projects/dscript/static/result.html', 'w') #Html 
+		if topology == '1214' or topology == '2214':
+			self.index = 2
+		if topology == '1314' or topology == '1324':
+			self.index = 3
+
+		self.result = open(
+			'/home/tbsadmin/projects/dscript/static/result.html', 'w') #Html 
 		self.create_html_header()
-		self.create_table_header()
+		self.create_table_header(self.index)
 
 	def adjust_4_d3(self, modem):
 		"""No adjustment is needed
@@ -38,37 +47,33 @@ class Table(object):
 	def adjust_4_d2(self, modem):
 		"""Adds empty cells for d2 modems
 		
-		Depending on topology additional one, two or more entries need to be 
-		added to certain values. This to compensate for bonded d3 values by 
-		creating empty cells.
-
-		TODO: Depending on topology two different sets of values are created
+		Depending on the topology additional one, two or more empty entries 
+		need to be added to compensated for d3 bonded tables columns. 
 
 		Args:
 			modem: D2 modem
 		"""
-		#Empty US
-		modem.upsnr.append('-')
-		modem.receivedpwr.append('-')
-		modem.reportedtransmitpwr.append('-')
-		modem.reportedtransmitpwr.append('-')
-		modem.toff.insert(1,'-')
-		modem.toff.insert(3,'-')
-		modem.uncorrectables.append('-')
-		modem.reason.append('-')
-		#Empty DS
-		modem.docsIfDownChannelPower.append('-')
-		modem.docsIfDownChannelPower.append('-')
-		modem.docsIfDownChannelPower.append('-')
-		modem.docsIfSigQSignalNoise.append('-')
-		modem.docsIfSigQSignalNoise.append('-')
-		modem.docsIfSigQSignalNoise.append('-')
-		modem.docsIfSigQUncorrectables.append('-')
-		modem.docsIfSigQUncorrectables.append('-')
-		modem.docsIfSigQUncorrectables.append('-')
-		modem.docsIfSigQMicroreflections.append('-')
-		modem.docsIfSigQMicroreflections.append('-')
-		modem.docsIfSigQMicroreflections.append('-')
+		#Creating empty cells if a d2 value exists already
+		#(2 extra if it is a 3 bonded US. 1 extra if 2 bonded US)
+		for i in range (self.index -1):
+			modem.upsnr.append(' ')
+			modem.receivedpwr.append(' ')
+			modem.reportedtransmitpwr.append(' ')
+			modem.toff.insert(1,' ')
+			modem.toff.insert(4,' ')
+			modem.uncorrectables.append(' ')
+			
+		#if no value exists for this column, one extra empty cell
+		#needs to be appended
+		modem.reportedtransmitpwr.append(' ')
+		modem.reason.append(' ')
+
+		#Empty DS (always append 3 times).
+		for i in range(3):
+			modem.docsIfDownChannelPower.append(' ')
+			modem.docsIfSigQSignalNoise.append(' ')
+			modem.docsIfSigQUncorrectables.append(' ')
+			modem.docsIfSigQMicroreflections.append(' ')
 
 		self.write_tr(modem)
 
@@ -142,6 +147,14 @@ class Table(object):
 		for value in modem.docsIfCmStatusT4Timeouts:
 			self.result.write('<td>' + value + '</td>')		
 		self.result.write('</tr>')
+
+	def write_th(self, title, loop):
+		"""writes the th into a file
+
+		Depending on topology and called from create_table_header().
+		"""
+		for i in range(loop):
+			self.result.write('<th>' + title + '</th>')
 		
 	def create_html_header(self):
 		"""Writes HTML Header
@@ -152,9 +165,14 @@ class Table(object):
 		self.result.write('<!DOCTYPE HTML>')
 		self.result.write('<html>')
 		self.result.write('<head>')	
-		self.result.write('<link rel="stylesheet" href="/static/themes/blue/style.css" />')
-		self.result.write('<script type="text/javascript" src="http://code.jquery.com/jquery-1.8.3.min.js"></script>')
-		self.result.write('<script type="text/javascript" src="/static/jquery.tablesorter.min.js"></script>')
+		self.result.write(
+			'<link rel="stylesheet" href="/static/themes/blue/style.css" />')
+		self.result.write(
+			'<script type="text/javascript"' 
+			' src="http://code.jquery.com/jquery-1.8.3.min.js"></script>')
+		self.result.write(
+			'<script type="text/javascript"'
+			' src="/static/jquery.tablesorter.min.js"></script>')
 		self.result.write('<script type="text/javascript">')
 		self.result.write('jQuery(document).ready(function()')
 		self.result.write('{') 
@@ -169,54 +187,35 @@ class Table(object):
 		self.result.write('</head>')
 		self.result.write('<body>')
 
-	def create_table_header(self):
+	def create_table_header(self, index):
 		"""Writes HTML table header"""
-		
 		self.result.write('<table id="resultTable" class="tablesorter">')
 		self.result.write('<thead>')
 		self.result.write('<tr>')
-		self.result.write('<th>mac</th>')
-		self.result.write('<th>ip</th>')
-		self.result.write('<th>iface</th>')
-		self.result.write('<th>state</th>')
-		self.result.write('<th>rxpwr</th>') 
-		self.result.write('<th>Docsis</th>')
-		self.result.write('<th>upsnr</th>')
-		self.result.write('<th>upsnr</th>')
-		self.result.write('<th>receivedpwr</th>')
-		self.result.write('<th>receivedpwr</th>')
-		self.result.write('<th>reportedtransmitpwr</th>')
-		self.result.write('<th>reportedtransmitpwr</th>')
-		self.result.write('<th>dspwr</th>')
-		self.result.write('<th>toff</th>')
-		self.result.write('<th>toff</th>')
-		self.result.write('<th>init toff</th>')
-		self.result.write('<th>init toff</th>')
-		self.result.write('<th>uncorrectables</th>')
-		self.result.write('<th>uncorrectables</th>')
-		self.result.write('<th>flaps</th>')
-		self.result.write('<th>errors</th>')
-		self.result.write('<th>reason</th>')
-		self.result.write('<th>docsIfDownChannelPower</th>')
-		self.result.write('<th>docsIfDownChannelPower</th>')
-		self.result.write('<th>docsIfDownChannelPower</th>')
-		self.result.write('<th>docsIfDownChannelPower</th>')
-		self.result.write('<th>docsIfSigQSignalNoise</th>')
-		self.result.write('<th>docsIfSigQSignalNoise</th>')
-		self.result.write('<th>docsIfSigQSignalNoise</th>')
-		self.result.write('<th>docsIfSigQSignalNoise</th>')
-		self.result.write('<th>docsIfSigQUncorrectables</th>')
-		self.result.write('<th>docsIfSigQUncorrectables</th>')
-		self.result.write('<th>docsIfSigQUncorrectables</th>')
-		self.result.write('<th>docsIfSigQUncorrectables</th>')
-		self.result.write('<th>docsIfSigQMicroreflections</th>')
-		self.result.write('<th>docsIfSigQMicroreflections</th>')
-		self.result.write('<th>docsIfSigQMicroreflections</th>')
-		self.result.write('<th>docsIfSigQMicroreflections</th>')
-		self.result.write('<th>docsIfCmStatusTxPower</th>')
-		self.result.write('<th>docsIfCmStatusInvalidUcds</th>')
-		self.result.write('<th>docsIfCmStatusT3Timeouts</th>')
-		self.result.write('<th>docsIfCmStatusT4Timeouts</th>')
+		#US (index depends on the topology)
+		self.write_th('mac',1)
+		self.write_th('ip',1)
+		self.write_th('iface',1)
+		self.write_th('state',1)
+		self.write_th('rxpwr',1) 
+		self.write_th('Docsis',1)
+		self.write_th('upsnr',index)
+		self.write_th('receivedpwr',index)
+		self.write_th('reportedtransmitpwr',index)
+		self.write_th('dspwr',1)
+		self.write_th('toff',index)
+		self.write_th('init toff',index)
+		self.write_th('uncorrectables',index)
+		self.write_th('flaps',1)
+		self.write_th('errors',1)
+		self.write_th('reason',1)
+		#DS
+		self.write_th('docsIfDownChannelPower',4)
+		self.write_th('docsIfSigQSignalNoise<',4)
+		self.write_th('docsIfSigQUncorrectables',4)
+		self.write_th('docsIfSigQMicroreflections',4)
+		self.write_th('docsIfCmStatusTxPower',4)
+
 		self.result.write('</tr>')
 		self.result.write('</thead>')
 		self.result.write('<tbody>')

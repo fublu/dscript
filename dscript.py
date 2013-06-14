@@ -38,7 +38,7 @@ class Cmts(object):
 		self.name = name
 		self.tn = TelnetAccess(self.ip, self.name, IOS_UID, IOS_PW) 
     
-	def createMacDomain(self, iface):
+	def createMacDomain(self, iface, topology):
 		"""Creates and stores the mac domain.
 		
 		See MacDomain class.
@@ -46,7 +46,7 @@ class Cmts(object):
 		Args:
 			iface: the macdomain selected by the user
 		"""
-		self.macdomains  = MacDomain(iface)
+		self.macdomains  = MacDomain(iface, topology)
 
 	def getCMs(self):
 		"""Retrieves all modems in the specified macdomain
@@ -80,15 +80,16 @@ class MacDomain(object):
 	the cmts output. 
 	"""
 		
-	def __init__(self, name):
+	def __init__(self, name, topology):
 		"""Inits the macdomain
 		
 		Args:
 			name: represents the mac domain (ex. c5/1/0)
+			topology: HFC topology
 		"""
 		self.name = name
-		#TODO: 1x2 is only a placeholder until topology is implemented
-		self.table = Table('1x2') 
+		self.topology = topology
+		self.table = Table(topology) 
 
 	def extractData(self):
 		"""Extracts and filters modem values.
@@ -376,9 +377,11 @@ IOS_PW = 'hf4ev671'
 STATUS = open('/home/tbsadmin/projects/dscript/static/status', 'w') #Stats
 
 #Step 1.1 - Receiving argv(mac domain), create cmts, macdomain etc...
-argv = str(sys.argv[1])
+macdomain = str(sys.argv[1])
+topology = str(sys.argv[2])
+
 ubr01shr = Cmts('10.10.10.50', 'ubr01SHR') #Case Sensitiv, used for telnet prompt
-ubr01shr.createMacDomain(argv)
+ubr01shr.createMacDomain(macdomain, topology)
 ubr01shr.getCMs()
 
 #Step 2.1 - 2.5: Retrieve, filter data
