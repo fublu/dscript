@@ -3,6 +3,7 @@
 	Author:		Memleak13
 	Date:		22.06.13
 """
+import datetime
 
 class Table(object):
 	"""Represents an html table 
@@ -87,14 +88,22 @@ class Table(object):
 		Args:
 			modem: D1 modem
 		"""
-		self.result.write('<tr>')
-		self.result.write('<td>' + modem.mac + '</td>')
-		self.result.write('<td>' + modem.ip + '</td>')
-		self.result.write('<td>' + modem.iface + '</td>')
-		self.result.write('<td>' + modem.state + '</td>')
-		self.result.write('<td>' + modem.rxpwr + '</td>')
-		self.result.write('<td>' + modem.macversion[0] + '</td>')
-		self.result.write('</tr>')
+		try:
+			self.result.write('<tr>')
+			self.result.write('<td>' + modem.mac + '</td>')
+			self.result.write('<td>' + modem.ip + '</td>')
+			self.result.write('<td>' + modem.iface + '</td>')
+			self.result.write('<td>' + modem.state + '</td>')
+			self.result.write('<td>' + modem.rxpwr + '</td>')
+			self.result.write('<td>' + modem.macversion[0] + '</td>')
+			self.result.write('</tr>')
+		except Exception as e: 
+			DEBUG = open('/home/tbsadmin/projects/dscript/static/debug', 'a') #Debug
+			DEBUG.write(str(datetime.datetime.now()) + ' D1 Error\n')
+			DEBUG.write('mac: ' + modem.mac + '	ip: ' + modem.ip + '\n')
+			DEBUG.write(str(e) + '\n\n')
+			DEBUG.write(str(modem.__dict__) + '\n\n')
+			DEBUG.close()
 
 	def write_tr(self, modem):
 		"""Writes tr containg modem values
