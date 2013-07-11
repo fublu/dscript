@@ -1,5 +1,14 @@
 $def with ()
 
+<!--
+	Version:	Dev. 0.1 - Threading and URL corrections 
+	Author:		Memleak13
+	Date:		11.07.13
+
+	This file contains the webfrontend. It starts the server script and
+	requests a status update each second
+-->
+
 <!doctype html>
 <html>
 	<head>
@@ -49,7 +58,7 @@ $def with ()
 					return;
 		        }
 				
-				jQuery.getJSON("http://dscript.ziknet.ch/counter")
+				jQuery.getJSON("/counter")
 				.done(function(response) {
 					//checks automatically if the script is already running,
 					//if so it will disable the input fields			
@@ -71,14 +80,14 @@ $def with ()
 						autostart: false,
 						callback: function(index) { //console.log ("Debug: Timer Started");
 							//console.log ("Debug: Repeating AjaxCall requesting count");
-							jQuery.getJSON("http://dscript.ziknet.ch/counter")
+							jQuery.getJSON("/counter")
 							.done(function(response) {
 								//console.log ("Debug: AJAX - Received JSON");
 								//jQuery("#status").html(response.CM_COUNT + "/" + response.CM_TOTAL + " - Status: " + response.RUN_STATE);
 								jQuery("#status").html(response.CM_COUNT + "/" + response.CM_TOTAL);
 								if (response.RUN_STATE == 0) {
 									jQuery("#status").timer('stop');
-									jQuery("#result").load("http://dscript.ziknet.ch/static/result.html");
+									jQuery("#result").load("/static/result.html");
 								}
 							});
 						}	
@@ -95,7 +104,7 @@ $def with ()
 
 					//First Ajax request - Run the script 
 					jQuery.ajax({
-						url: "http://dscript.ziknet.ch/runscript", 
+						url: "/runscript", 
 						data: {
 							macdomain: macdomain,
 							topology: topology

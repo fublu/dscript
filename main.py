@@ -1,7 +1,7 @@
 """
-	Version:	0.1 - Beta
+	Version:	Dev. 0.1 - Threading and URL corrections 
 	Author:		Memleak13
-	Date:		13.06.13
+	Date:		11.07.13
 
 	This is the main module which is initilized by Apache.
 	Permissions must be set correctly, all files will be created with 
@@ -47,23 +47,23 @@ class runscript:
 		topology = argv.topology
 
 		try:
-			fh_status = open('/var/www/dscript/static/status')
+			fh_status = open(root + '/static/status')
 			data = json.loads(fh_status.read())
 			if data['RUN_STATE'] is 1:
 				return (1)
 			else:
-				os.system('/var/www/dscript/dscript.py %s %s &' 
+				os.system(root + '/dscript.py %s %s &' 
 						  % (macdomain, topology))
 		#Throw exception if file does not exist and runs dscript.py. dscript
 		#creates the file.
 		except:
-			os.system('/var/www/dscript/dscript.py %s %s &' % (macdomain, topology))
+			os.system(root + '/dscript.py %s %s &' % (macdomain, topology))
 
 class counter:
 	"""Returns run state and counter"""
 	
 	def GET(self):
-		fh_status = open('/var/www/dscript/static/status')
+		fh_status = open(root + '/static/status')
 		data = json.loads(fh_status.read())
 		fh_status.close()
 		web.header('Content-Type', 'application/json')

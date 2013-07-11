@@ -1,8 +1,11 @@
 #!/usr/bin/python
 """
-	Version:	0.1 - Beta
+	Version:	Dev. 0.1 - Threading and URL corrections 
 	Author:		Memleak13
-	Date:		13.06.13
+	Date:		11.07.13
+
+	This is the main script which requests the data from the cmts and modems.
+	It is started from main.py and calls table.py to create the html file.
 """
 #My modules
 from table import Table
@@ -14,6 +17,8 @@ import time
 import datetime      
 import telnetlib
 import json
+import threading
+import os
 from pysnmp.entity.rfc3413.oneliner import cmdgen
 
 
@@ -104,7 +109,7 @@ class MacDomain(object):
 		"""
 		
 		#Step 2.1: Reading and filtering the cmts output to include only modems
-		fin = open('/home/tbsadmin/projects/dscript/static/telnetoutput', 'r')
+		fin = open(ROOT + '/static/telnetoutput', 'r')
 		cleanedlist = []
 		for line in fin: 
 			cleanedlist.append(line)
@@ -115,10 +120,19 @@ class MacDomain(object):
 		CM_TOTAL = len(cleanedlist)
 		fin.close()
 		
-		#Step 2.2: Modem object is created with initial values.
-		cmdatafromcmts = []
+		#Step 2.2: Modem object (thread) is created with initial values.
+		#cmdatafromcmts = [] #NEW: needs to be added to CM
+		all_threads = []
 		for line in cleanedlist:
-			modem = Modem() 
+			modem = Modem(line) #NEW: add line to Modem
+			all_threads += [modem]
+			modem.start()
+		for thread in all_threads:
+			thread.join()
+			
+			"""
+			#NEW: All will be added to CM - can be initiated in init. 
+
 			del cmdatafromcmts[:]
 			cmdatafromcmts = line.split()
 			modem.mac = cmdatafromcmts[0].strip()
@@ -128,30 +142,39 @@ class MacDomain(object):
 			modem.rxpwr = cmdatafromcmts[5].strip()
 			
 			#Step 2.3: Setting US and other values retrieved from the cmts
+			
+			#NEW: LOCK
+			# 2 Reasons - 1. Access to CMTS limited, 2. Write file
 			ubr01shr.getCMverbose(cmdatafromcmts[0])
 			modem.setUSData()
+			#NEW: RELEASE
 		
 			#Step 2.4: 	Setting DS data retrieved from the modem 
 			# 			except (D1 Modems)
 			if 'DOC3.0' in modem.macversion or 'DOC2.0' in modem.macversion:
 				modem.setDSData()
-				
+			
+			#NEW: LOCK	
 			#Step 2.5: Writting html ouptut 
 			if 'DOC3.0' in modem.macversion:
-				self.table.adjust_4_d3(modem)
+				self.table.adjust_4_d3(modem) #NEW: not self
 			
-			elif 'DOC2.0' in modem.macversion:
+			elif 'DOC2.0' in modem.macversion: #NEW: not self
 				self.table.adjust_4_d2(modem)
 			
 			else:
-				self.table.adjust_4_d1(modem)
+				self.table.adjust_4_d1(modem) #NEW: not self
 
+				
 			global CM_COUNT
 			CM_COUNT+=1
 			writeState();
-			del modem
-	
-class Modem(object):
+			#NEW: RELEASE
+
+			del modem 
+			"""
+
+class Modem(threading.Thread):
 	"""Represents the modem.
 	
 	Includes all docis values retreived by the cmts or modem.
@@ -159,12 +182,19 @@ class Modem(object):
 	"""
 	
 	snmpcommunity = 'web4suhr'
-	def __init__(self):
+	lock = threading.Lock()
+
+	def __init__(self, line):
 		"""Inits modem setting all attributes to empty values
 		
 		To keep things simple, I created lists for all attributes except the
 		initial ones. Even if they only take one attribute.
+
+		Args:
+			line: contains one line of the cmts "show cable modem" output
 		"""
+		threading.Thread.__init__(self)
+		self.line = line
 		self.mac = ''
 		self.ip = ''
 		self.iface = ''
@@ -189,10 +219,48 @@ class Modem(object):
 		self.docsIfCmStatusInvalidUcds = []
 		self.docsIfCmStatusT3Timeouts = []
 		self.docsIfCmStatusT4Timeouts = []
-    
+
+	def run(self):
+		"""initiated by start()"""
+		values = self.line.split()
+		self.mac = values[0].strip()
+		self.ip = values[1].strip()
+		self.iface = values[2].strip()
+		self.state = values[3].strip()
+		self.rxpwr = values[5].strip()
+
+		#Step 2.3: Setting US and other values retrieved from the cmts
+		#The look has two purposes. 1 to limit number of telnet connections
+		#to cmts. 2 to lock the file access (telnetoutput)
+		Modem.lock.acquire()
+		ubr01shr.getCMverbose(values[0])
+		self.setUSData()
+		Modem.lock.release()
+
+		#Step 2.4: 	Setting DS data retrieved from the modem 
+		# 			except (D1 Modems), no Lock.
+		if 'DOC3.0' in self.macversion or 'DOC2.0' in self.macversion:
+			self.setDSData()
+
+		#Step 2.5: Writting html ouptut
+		Modem.lock.acquire() 
+		if 'DOC3.0' in self.macversion:
+			ubr01shr.macdomains.table.adjust_4_d3(self)
+
+		elif 'DOC2.0' in self.macversion:
+			ubr01shr.macdomains.table.adjust_4_d2(self)
+
+		else:
+			ubr01shr.macdomains.table.adjust_4_d1(self)
+		
+		global CM_COUNT
+		CM_COUNT+=1
+		writeState();
+		Modem.lock.release()	
+
 	def setUSData(self):
 		"""Sets US Data"""
-		fin = open('/home/tbsadmin/projects/dscript/static/telnetoutput', 'r')
+		fin = open(ROOT + '/static/telnetoutput', 'r')
 		for line in fin:
 			if 'MAC Version' in line:
 				value = line.split(':')
@@ -244,8 +312,9 @@ class Modem(object):
 	def setDSData(self):
 		"""Sets DS Data."""
 		if 'online' in self.state:
-			global CM_ONLINE
-			CM_ONLINE += 1					
+			#disabled temporary as this would require another lock
+			#global CM_ONLINE
+			#CM_ONLINE += 1					
 			receivedsnmpvalues = self.getsnmp()
 			for mib, snmpvalue in sorted(receivedsnmpvalues.iteritems()):
 				if 'docsIfDownChannelPower' in mib:
@@ -307,7 +376,7 @@ class Modem(object):
 			#print('%s = %s' % (name.prettyPrint(), val.prettyPrint()))
 
 		except Exception as e:
-			DEBUG = open('/home/tbsadmin/projects/dscript/static/debug', 'a') #Debug
+			DEBUG = open(ROOT + '/static/debug', 'a') #Debug
 			DEBUG.write(str(datetime.datetime.now()) + 'SNMP ERROR\n')
 			DEBUG.write('mac: ' + self.mac + '	ip: ' + self.ip + '\n')
 			DEBUG.write(str(e) + '\n\n')
@@ -355,7 +424,7 @@ class TelnetAccess(object):
 			command: whatever could this stand for ...
 		"""
 		self.telnetoutput = open(
-			'/home/tbsadmin/projects/dscript/static/telnetoutput', 'w')		
+			ROOT + '/static/telnetoutput', 'w')		
 		self.tn.write(command + "\n")
 		output = self.tn.read_until(self.prompt)
 		self.telnetoutput.write(output)
@@ -378,13 +447,14 @@ def writeState():
 
 #TODO: Add following to main() 
 
+ROOT = os.path.dirname(__file__)	#setting root path to directory of file
 RUN_STATE = 1	#states if the script is running (0=no, 1=yes)
 CM_TOTAL = ''	#holds all CM in macdomain
 CM_COUNT = 0	#holds number of processed modems
 CM_ONLINE = 0	#this counter counts only online modems
 IOS_UID = 'dscript'
 IOS_PW = 'hf4ev671'
-STATUS = open('/home/tbsadmin/projects/dscript/static/status', 'w') #Stats
+STATUS = open(ROOT + '/static/status', 'w') #Stats
 
 #Step 1.1 - Receiving argv(mac domain), create cmts, macdomain etc...
 macdomain = str(sys.argv[1])

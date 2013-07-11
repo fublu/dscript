@@ -1,9 +1,12 @@
 """
-	Version:	0.1 - Beta
+	Version:	Dev. 0.1 - Threading and URL corrections 
 	Author:		Memleak13
-	Date:		22.06.13
+	Date:		11.07.13
+
+	This module prepares the data and is responsible to create the html file
 """
 import datetime
+import os
 
 class Table(object):
 	"""Represents an html table 
@@ -25,13 +28,14 @@ class Table(object):
 		Args: topology: Macdomain topology 
 						(ex. 1214 = 1USG (2xbonded), 1 DSG(4xbonded))
 		"""
+		ROOT = os.path.dirname(__file__) #path to root directory
 		if topology == '1214' or topology == '2214':
 			self.index = 2
 		if topology == '1314' or topology == '1324':
 			self.index = 3
 
 		self.result = open(
-			'/home/tbsadmin/projects/dscript/static/result.html', 'w') #Html 
+			ROOT + '/static/result.html', 'w') #Html 
 		self.create_html_header()
 		self.create_table_header(self.index)
 
@@ -98,7 +102,7 @@ class Table(object):
 			self.result.write('<td>' + modem.macversion[0] + '</td>')
 			self.result.write('</tr>')
 		except Exception as e: 
-			DEBUG = open('/home/tbsadmin/projects/dscript/static/debug', 'a') #Debug
+			DEBUG = open(ROOT + '/static/debug', 'a') #Debug
 			DEBUG.write(str(datetime.datetime.now()) + ' D1 Error\n')
 			DEBUG.write('mac: ' + modem.mac + '	ip: ' + modem.ip + '\n')
 			DEBUG.write(str(e) + '\n\n')
