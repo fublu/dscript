@@ -123,10 +123,12 @@ class MacDomain(object):
 		#Step 2.2: Modem object (thread) is created with initial values.
 		#cmdatafromcmts = [] #NEW: needs to be added to CM
 		all_threads = []
+		thread_id = 1 # TODO: Setting a thread id for debugging purposes
 		for line in cleanedlist:
-			modem = Modem(line) #NEW: add line to Modem
+			modem = Modem(line, thread_id) #NEW: add line to Modem
 			all_threads += [modem]
 			modem.start()
+			thread_id += 1
 		for thread in all_threads:
 			thread.join()
 			
@@ -182,9 +184,10 @@ class Modem(threading.Thread):
 	"""
 	
 	snmpcommunity = 'web4suhr'
-	lock = threading.Lock()
+	lock1 = threading.Lock()
+	lock2 = threading.Lock()
 
-	def __init__(self, line):
+	def __init__(self, line, thread_id):
 		"""Inits modem setting all attributes to empty values
 		
 		To keep things simple, I created lists for all attributes except the
@@ -194,6 +197,7 @@ class Modem(threading.Thread):
 			line: contains one line of the cmts "show cable modem" output
 		"""
 		threading.Thread.__init__(self)
+		self.thread_id = thread_id
 		self.line = line
 		self.mac = ''
 		self.ip = ''
@@ -232,18 +236,28 @@ class Modem(threading.Thread):
 		#Step 2.3: Setting US and other values retrieved from the cmts
 		#The look has two purposes. 1 to limit number of telnet connections
 		#to cmts. 2 to lock the file access (telnetoutput)
-		Modem.lock.acquire()
+		Modem.lock1.acquire()
+		
+		DEBUG.write('Thread Id: ' + str(self.thread_id) + 
+				'    CMVerbose Timestamp: ' + str(datetime.datetime.now()) + 
+				'	 State: ' + self.state + '\n')
+		
 		ubr01shr.getCMverbose(values[0])
 		self.setUSData()
-		Modem.lock.release()
+		Modem.lock1.release()
 
 		#Step 2.4: 	Setting DS data retrieved from the modem 
-		# 			except (D1 Modems), no Lock.
+		# 			except (D1 Modems), no Lock.l
 		if 'DOC3.0' in self.macversion or 'DOC2.0' in self.macversion:
 			self.setDSData()
 
 		#Step 2.5: Writting html ouptut
-		Modem.lock.acquire() 
+		Modem.lock2.acquire()
+
+		DEBUG.write('Thread Id: ' + str(self.thread_id) + 
+			'    HTML Output Timestamp: ' + str(datetime.datetime.now()) + 
+			' 	 MAC: ' + self.mac + '\n') 
+		
 		if 'DOC3.0' in self.macversion:
 			ubr01shr.macdomains.table.adjust_4_d3(self)
 
@@ -256,7 +270,7 @@ class Modem(threading.Thread):
 		global CM_COUNT
 		CM_COUNT+=1
 		writeState();
-		Modem.lock.release()	
+		Modem.lock2.release()	
 
 	def setUSData(self):
 		"""Sets US Data"""
@@ -455,6 +469,7 @@ CM_ONLINE = 0	#this counter counts only online modems
 IOS_UID = 'dscript'
 IOS_PW = 'hf4ev671'
 STATUS = open(ROOT + '/static/status', 'w') #Stats
+DEBUG = open(ROOT + '/static/debug', 'w')
 
 #Step 1.1 - Receiving argv(mac domain), create cmts, macdomain etc...
 macdomain = str(sys.argv[1])
