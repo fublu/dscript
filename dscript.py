@@ -33,7 +33,14 @@ class Cmts(object):
 	"""
 	
 	def __init__(self, ip, name):
-		"""Inits cmts with ip, name and telnet object.
+		"""Inits cmts with ip, name and 2 telnet object.
+
+		 This creates 2 telnet streams. Depending on the tread id 
+		 1 or the other is used. It seems that only 4 request per
+		 second per stream are processed by the cmts. The idea is 
+		 to double this by having 2 telnet streams open
+
+		 TODO: Above does not seem to be quite true however !
 		
 		Args:
 			ip: ip address
@@ -41,7 +48,8 @@ class Cmts(object):
 		"""
 		self.ip = ip
 		self.name = name
-		self.tn = TelnetAccess(self.ip, self.name, IOS_UID, IOS_PW) 
+		self.tn1 = TelnetAccess(self.ip, self.name, IOS_UID, IOS_PW)
+		self.tn2 = TelnetAccess(self.ip, self.name, IOS_UID, IOS_PW) 
     
 	def createMacDomain(self, iface, topology):
 		"""Creates and stores the mac domain.
@@ -57,11 +65,10 @@ class Cmts(object):
 		"""Retrieves all modems in the specified macdomain
 		
 		By running the ios command "show cable modem cable [macdomain]"
-		The output is written into the file telnetoutput
 		"""
-		return self.tn.runCommand('show cable modem cable ' + str(self.macdomains.name))
+		return self.tn1.runCommand('show cable modem cable ' + str(self.macdomains.name))
 
-	def getCMverbose(self, cmmac):
+	def getCMverbose(self, cmmac, thread_id):
 		"""Retroves values for a specific cable modem.
 		
 		By running the ios comand "show cable modem [mac] verbose.
@@ -69,13 +76,20 @@ class Cmts(object):
 		
 		Args:
 			cmmac: mac address of the cable modem
+			thread_id: used to alternate between telnet streams
 		"""
-		return self.tn.runCommand('show cable modem ' + cmmac + ' verbose')
+		if thread_id % 2 == 0:
+			return self.tn1.runCommand('show cable modem ' + cmmac + ' verbose')
+		else:
+			return self.tn2.runCommand('show cable modem ' + cmmac + ' verbose')
+			
 
 	def __del__(self):
 		"""Closes and deletes the telnet connection"""
-		self.tn.closeTN() 	# close telnet connection
-		del self.tn 		# delete object
+		self.tn1.closeTN() 	# close telnet connection
+		self.tn2.closeTN() 	# close telnet connection
+		del self.tn1 		# delete object
+		del self.tn2 		# delete object
 
 class MacDomain(object):
 	"""Represents the mac domain.
@@ -190,11 +204,17 @@ class Modem(threading.Thread):
 	
 	Includes all docis values retreived by the cmts or modem.
 	Connects to the modem using snmp.
+
+	3 locks are created. 1 for the first telnet stream, 1 for 
+	the second telnet stream and 1 to write the html file
+
+	The thread id is used to alternate between telnet streams
 	"""
 	
 	snmpcommunity = 'web4suhr'
 	lock1 = threading.Lock()
 	lock2 = threading.Lock()
+	lock3 = threading.Lock()
 
 	def __init__(self, line, thread_id):
 		"""Inits modem setting all attributes to empty values
@@ -245,17 +265,33 @@ class Modem(threading.Thread):
 		#Step 2.3: Setting US and other values retrieved from the cmts
 		#The look has two purposes. 1 to limit number of telnet connections
 		#to cmts. 2 to lock the file access (telnetoutput)
-		Modem.lock1.acquire()
-		
-		"""
-		DEBUG.write('Thread Id: ' + str(self.thread_id) + 
-				'    CMVerbose Timestamp: ' + str(datetime.datetime.now()) + 
-				'	 State: ' + self.state + '\n')
-		"""
+		#TODO: find a better way, duplicated code, especially as the same
+		#	the same condition is found in the cmts class again!
 
-		verbose_output = ubr01shr.getCMverbose(values[0])
-		self.setUSData(verbose_output)
-		Modem.lock1.release()
+		if self.thread_id % 2 == 0:
+			Modem.lock1.acquire()
+			
+			"""
+			DEBUG.write('Thread Id: ' + str(self.thread_id) + 
+					'    CMVerbose Timestamp: ' + str(datetime.datetime.now()) + 
+					'	 State: ' + self.state + '\n')
+			"""
+
+			verbose_output = ubr01shr.getCMverbose(values[0], self.thread_id)
+			self.setUSData(verbose_output)
+			Modem.lock1.release()
+		else: 
+			Modem.lock2.acquire()
+			
+			"""
+			DEBUG.write('Thread Id: ' + str(self.thread_id) + 
+					'    CMVerbose Timestamp: ' + str(datetime.datetime.now()) + 
+					'	 State: ' + self.state + '\n')
+			"""
+
+			verbose_output = ubr01shr.getCMverbose(values[0], self.thread_id)
+			self.setUSData(verbose_output)
+			Modem.lock2.release()
 
 		#Step 2.4: 	Setting DS data retrieved from the modem 
 		# 			except (D1 Modems), no Lock.l
@@ -263,7 +299,7 @@ class Modem(threading.Thread):
 			self.setDSData()
 
 		#Step 2.5: Writting html ouptut
-		Modem.lock2.acquire()
+		Modem.lock3.acquire()
 
 		"""
 		DEBUG.write('Thread Id: ' + str(self.thread_id) + 
@@ -280,10 +316,12 @@ class Modem(threading.Thread):
 		else:
 			ubr01shr.macdomains.table.adjust_4_d1(self)
 		
+		
 		global CM_COUNT
 		CM_COUNT+=1
 		writeState();
-		Modem.lock2.release()	
+		
+		Modem.lock3.release()	
 
 	def setUSData(self, verbose_output):
 		"""Sets US Data"""
@@ -446,16 +484,15 @@ class TelnetAccess(object):
 	def runCommand(self,command):
 		"""Runs a command on a device connected by telnet.
 		
-		Writes the output into a file
+		and returns the output
 		
 		Args:
 			command: whatever could this stand for ...
 		"""
-		self.telnetoutput = open(
-			ROOT + '/static/telnetoutput', 'w')		
+		#self.telnetoutput = open(
+		#	ROOT + '/static/telnetoutput', 'w')		
 		self.tn.write(command + "\n")
-		output =  self.tn.read_until(self.prompt)
-		return output
+		return self.tn.read_until(self.prompt)
 		#self.telnetoutput.write(output)
 		#self.telnetoutput.close()
 
