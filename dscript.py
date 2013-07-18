@@ -59,7 +59,7 @@ class Cmts(object):
 		By running the ios command "show cable modem cable [macdomain]"
 		The output is written into the file telnetoutput
 		"""
-		self.tn.runCommand('show cable modem cable ' + str(self.macdomains.name))
+		return self.tn.runCommand('show cable modem cable ' + str(self.macdomains.name))
 
 	def getCMverbose(self, cmmac):
 		"""Retroves values for a specific cable modem.
@@ -70,7 +70,7 @@ class Cmts(object):
 		Args:
 			cmmac: mac address of the cable modem
 		"""
-		self.tn.runCommand('show cable modem ' + cmmac + ' verbose')
+		return self.tn.runCommand('show cable modem ' + cmmac + ' verbose')
 
 	def __del__(self):
 		"""Closes and deletes the telnet connection"""
@@ -96,7 +96,7 @@ class MacDomain(object):
 		self.topology = topology
 		self.table = Table(topology) 
 
-	def extractData(self):
+	def extractData(self, get_cm_output):
 		"""Extracts and filters modem values.
 		
 		Filters the cmts output to contain just modems.
@@ -109,16 +109,25 @@ class MacDomain(object):
 		"""
 		
 		#Step 2.1: Reading and filtering the cmts output to include only modems
-		fin = open(ROOT + '/static/telnetoutput', 'r')
+		
+		#fin = open(ROOT + '/static/telnetoutput', 'r')
+		#DEBUG.write(get_cm_output) 
+		get_cm_output = get_cm_output.split('\n')
+		
+		"""
+		for line in cm_output:
+			DEBUG.write('Test' + line + '\n') 
+		"""
+
 		cleanedlist = []
-		for line in fin: 
+		for line in get_cm_output:
 			cleanedlist.append(line)
 		del cleanedlist[0:4]
 		del cleanedlist[len(cleanedlist)-1]
 		del cleanedlist[len(cleanedlist)-1]
 		global CM_TOTAL
 		CM_TOTAL = len(cleanedlist)
-		fin.close()
+		#fin.close()
 		
 		#Step 2.2: Modem object (thread) is created with initial values.
 		#cmdatafromcmts = [] #NEW: needs to be added to CM
@@ -238,12 +247,14 @@ class Modem(threading.Thread):
 		#to cmts. 2 to lock the file access (telnetoutput)
 		Modem.lock1.acquire()
 		
+		"""
 		DEBUG.write('Thread Id: ' + str(self.thread_id) + 
 				'    CMVerbose Timestamp: ' + str(datetime.datetime.now()) + 
 				'	 State: ' + self.state + '\n')
-		
-		ubr01shr.getCMverbose(values[0])
-		self.setUSData()
+		"""
+
+		verbose_output = ubr01shr.getCMverbose(values[0])
+		self.setUSData(verbose_output)
 		Modem.lock1.release()
 
 		#Step 2.4: 	Setting DS data retrieved from the modem 
@@ -254,10 +265,12 @@ class Modem(threading.Thread):
 		#Step 2.5: Writting html ouptut
 		Modem.lock2.acquire()
 
+		"""
 		DEBUG.write('Thread Id: ' + str(self.thread_id) + 
 			'    HTML Output Timestamp: ' + str(datetime.datetime.now()) + 
 			' 	 MAC: ' + self.mac + '\n') 
-		
+		"""
+
 		if 'DOC3.0' in self.macversion:
 			ubr01shr.macdomains.table.adjust_4_d3(self)
 
@@ -272,10 +285,11 @@ class Modem(threading.Thread):
 		writeState();
 		Modem.lock2.release()	
 
-	def setUSData(self):
+	def setUSData(self, verbose_output):
 		"""Sets US Data"""
-		fin = open(ROOT + '/static/telnetoutput', 'r')
-		for line in fin:
+		verbose_output = verbose_output.split('\n')
+		#fin = open(ROOT + '/static/telnetoutput', 'r')
+		for line in verbose_output:
 			if 'MAC Version' in line:
 				value = line.split(':')
 				#Line needs to be split again in case of multiple values(bonded)
@@ -321,7 +335,7 @@ class Modem(threading.Thread):
 				value = value[1].split()
 				for index in value:
 					self.reason.append(index.strip())
-		fin.close()
+		#fin.close()
 
 	def setDSData(self):
 		"""Sets DS Data."""
@@ -440,9 +454,10 @@ class TelnetAccess(object):
 		self.telnetoutput = open(
 			ROOT + '/static/telnetoutput', 'w')		
 		self.tn.write(command + "\n")
-		output = self.tn.read_until(self.prompt)
-		self.telnetoutput.write(output)
-		self.telnetoutput.close()
+		output =  self.tn.read_until(self.prompt)
+		return output
+		#self.telnetoutput.write(output)
+		#self.telnetoutput.close()
 
 	def closeTN(self):
 		"""Close connection"""
@@ -477,10 +492,10 @@ topology = str(sys.argv[2])
 
 ubr01shr = Cmts('10.10.10.50', 'ubr01SHR') #Case Sensitiv, used for telnet prompt
 ubr01shr.createMacDomain(macdomain, topology)
-ubr01shr.getCMs()
+get_cm_output = ubr01shr.getCMs()
 
 #Step 2.1 - 2.5: Retrieve, filter data
-ubr01shr.macdomains.extractData()	 
+ubr01shr.macdomains.extractData(get_cm_output)	 
 
 #Step 3 - Cleaning up
 ubr01shr.macdomains.table.create_html_footer()

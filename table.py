@@ -28,14 +28,14 @@ class Table(object):
 		Args: topology: Macdomain topology 
 						(ex. 1214 = 1USG (2xbonded), 1 DSG(4xbonded))
 		"""
-		ROOT = os.path.dirname(__file__) #path to root directory
+		self.ROOT = os.path.dirname(__file__) #path to root directory
 		if topology == '1214' or topology == '2214':
 			self.index = 2
 		if topology == '1314' or topology == '1324':
 			self.index = 3
 
 		self.result = open(
-			ROOT + '/static/result.html', 'w') #Html 
+			self.ROOT + '/static/result.html', 'w') #Html 
 		self.create_html_header()
 		self.create_table_header(self.index)
 
@@ -102,13 +102,15 @@ class Table(object):
 			self.result.write('<td>' + modem.macversion[0] + '</td>')
 			self.result.write('</tr>')
 		except Exception as e: 
-			DEBUG = open(ROOT + '/static/debug', 'a') #Debug
+			"""
+			DEBUG = open(self.ROOT + '/static/debug', 'a') #Debug
 			DEBUG.write(str(datetime.datetime.now()) + ' D1 Error\n')
 			DEBUG.write('mac: ' + modem.mac + '	ip: ' + modem.ip + '\n')
 			DEBUG.write(str(e) + '\n\n')
 			DEBUG.write(str(modem.__dict__) + '\n\n')
 			DEBUG.close()
-
+			"""
+			
 	def write_tr(self, modem):
 		"""Writes tr containg modem values
 
