@@ -228,14 +228,16 @@ class Modem(threading.Thread):
 			self.setUSData(verbose_output)
 			
 		#Step 2.4: 	Setting DS data retrieved from the modem by snmp
-		#Todo: add d1 ds values
-		if 'DOC3.0' in self.macversion or 'DOC2.0' in self.macversion:
+		#Todo: Strangely enough if I disable this if, it messes up
+		#the html table. D2 values are not properly displayed anymore ...
+		if ('DOC3.0' in self.macversion or 'DOC2.0' in self.macversion or 
+			'DOC1.1' in self.macversion):
 			self.setDSData()
 
 		#Step 2.5: Adjusting table for d2 and d1 values
 		if 'DOC3.0' in self.macversion:
 			ubr01shr.macdomains.table.adjust_4_d3(self)
-		elif 'DOC2.0' in self.macversion:
+		elif 'DOC2.0' in self.macversion or 'DOC1.1' in self.macversion:
 			ubr01shr.macdomains.table.adjust_4_d2(self)
 		else:
 			ubr01shr.macdomains.table.adjust_4_d1(self)
@@ -424,7 +426,7 @@ queue = Queue.Queue()
 exit_marker = object()
 
 #To run script from command line
-#macdomain = '5/1/0' #Debug
+#macdomain = '5/1/1' #Debug
 #topology = '1214' #Debug
 
 ubr01shr = Cmts('10.10.10.50', 'ubr01SHR') #Case Sensitiv! Telnet prompt!

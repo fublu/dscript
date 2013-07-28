@@ -88,6 +88,8 @@ $def with ()
 								if (response.RUN_STATE == 0) {
 									jQuery("#status").timer('stop');
 									jQuery("#result").load("/static/result.html");
+									jQuery("button").removeAttr('disabled');
+									jQuery("select").removeAttr('disabled');
 								}
 							});
 						}	

@@ -10,6 +10,7 @@ import os
 import json
 import threading
 import Queue
+import datetime
 
 class Control (threading.Thread):
 	"""Builds the final html page
@@ -42,58 +43,60 @@ class Control (threading.Thread):
 			modem = self.queue.get()
 			if modem is self.exit:
 				break
-			self.result.write('<tr>')
-			self.result.write('<td>' + modem.mac + '</td>')
-			self.result.write('<td>' + modem.ip + '</td>')
-			self.result.write('<td>' + modem.iface + '</td>')
-			self.result.write('<td>' + modem.state + '</td>')
-			self.result.write('<td>' + modem.rxpwr + '</td>')
-			#US 
-			for value in modem.macversion:
-				self.result.write('<td>' + value + '</td>')
-			for value in modem.upsnr:
-				self.result.write('<td>' + value + '</td>')
-			for value in modem.receivedpwr:
-				self.result.write('<td>' + value + '</td>')
-			for value in modem.reportedtransmitpwr:
-				self.result.write('<td>' + value + '</td>')
-			for value in modem.dspwr:
-				self.result.write('<td>' + value + '</td>')
-			for value in modem.toff:
-				self.result.write('<td>' + value + '</td>')
-			for value in modem.uncorrectables:
-				self.result.write('<td>' + value + '</td>')
-			for value in modem.flaps:
-				self.result.write('<td>' + value + '</td>')
-			for value in modem.errors:
-				self.result.write('<td>' + value + '</td>')
-			for value in modem.reason:
-				self.result.write('<td>' + value + '</td>')
-			#DS	
-			for value in modem.docsIfDownChannelPower:
-				self.result.write('<td>' + value + '</td>')
-			for value in modem.docsIfSigQSignalNoise:
-				self.result.write('<td>' + value + '</td>')
-			for value in modem.docsIfSigQUncorrectables:
-				self.result.write('<td>' + value + '</td>')
-			for value in modem.docsIfSigQMicroreflections:
-				self.result.write('<td>' + value + '</td>')
-			for value in modem.docsIfCmStatusTxPower:
-				self.result.write('<td>' + value + '</td>')
-			for value in modem.docsIfCmStatusInvalidUcds:
-				self.result.write('<td>' + value + '</td>')
-			for value in modem.docsIfCmStatusT3Timeouts:
-				self.result.write('<td>' + value + '</td>')
-			for value in modem.docsIfCmStatusT4Timeouts:
-				self.result.write('<td>' + value + '</td>')		
-			self.result.write('</tr>')
+			elif 'DOC1.0' in modem.macversion:
+				self.write_d1(modem)
+			else:	
+				self.result.write('<tr>')
+				self.result.write('<td>' + modem.mac + '</td>')
+				self.result.write('<td>' + modem.ip + '</td>')
+				self.result.write('<td>' + modem.iface + '</td>')
+				self.result.write('<td>' + modem.state + '</td>')
+				self.result.write('<td>' + modem.rxpwr + '</td>')
+				#US 
+				for value in modem.macversion:
+					self.result.write('<td>' + value + '</td>')
+				for value in modem.upsnr:
+					self.result.write('<td>' + value + '</td>')
+				for value in modem.receivedpwr:
+					self.result.write('<td>' + value + '</td>')
+				for value in modem.reportedtransmitpwr:
+					self.result.write('<td>' + value + '</td>')
+				for value in modem.dspwr:
+					self.result.write('<td>' + value + '</td>')
+				for value in modem.toff:
+					self.result.write('<td>' + value + '</td>')
+				for value in modem.uncorrectables:
+					self.result.write('<td>' + value + '</td>')
+				for value in modem.flaps:
+					self.result.write('<td>' + value + '</td>')
+				for value in modem.errors:
+					self.result.write('<td>' + value + '</td>')
+				for value in modem.reason:
+					self.result.write('<td>' + value + '</td>')
+				#DS	
+				for value in modem.docsIfDownChannelPower:
+					self.result.write('<td>' + value + '</td>')
+				for value in modem.docsIfSigQSignalNoise:
+					self.result.write('<td>' + value + '</td>')
+				for value in modem.docsIfSigQUncorrectables:
+					self.result.write('<td>' + value + '</td>')
+				for value in modem.docsIfSigQMicroreflections:
+					self.result.write('<td>' + value + '</td>')
+				for value in modem.docsIfCmStatusTxPower:
+					self.result.write('<td>' + value + '</td>')
+				for value in modem.docsIfCmStatusInvalidUcds:
+					self.result.write('<td>' + value + '</td>')
+				for value in modem.docsIfCmStatusT3Timeouts:
+					self.result.write('<td>' + value + '</td>')
+				for value in modem.docsIfCmStatusT4Timeouts:
+					self.result.write('<td>' + value + '</td>')		
+				self.result.write('</tr>')
 			
 			self.cm_count += 1
 			self.writeState(self.cm_total, self.cm_count, self.cm_online,
 				self.run_state)
 			self.queue.task_done()
 			
-
 	def writeState(self, cm_total, cm_count, cm_online, run_state): 
 		"""Writes stats into file
 		
@@ -105,6 +108,30 @@ class Control (threading.Thread):
 		self.status.seek(0)
 		self.status.write(json.dumps(data))
 
+	def write_d1(self, modem):
+		"""Writes d1 modems
+
+		As most d1 modems are offline anyway, and I am to lazy to implement 
+		another adjust rule, I just add the initial values to the table
+
+		Args:
+			modem: cable modem
+		"""
+		try:
+			self.result.write('<tr>')
+			self.result.write('<td>' + modem.mac + '</td>')
+			self.result.write('<td>' + modem.ip + '</td>')
+			self.result.write('<td>' + modem.iface + '</td>')
+			self.result.write('<td>' + modem.state + '</td>')
+			self.result.write('<td>' + modem.rxpwr + '</td>')
+			self.result.write('<td>' + modem.macversion[0] + '</td>')
+			self.result.write('</tr>')
+		except Exception as e: 
+			self.debug.write(str(datetime.datetime.now()) + ' D1 Error\n')
+			self.debug.write('mac: ' + modem.mac + '	ip: ' + modem.ip + '\n')
+			self.debug.write(str(e) + '\n\n')
+			self.debug.write(str(modem.__dict__) + '\n\n')
+	
 	def write_th(self, title, loop):
 		"""writes the th into a file
 
