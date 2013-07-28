@@ -7,6 +7,8 @@
 """
 import datetime
 import os
+import Queue
+import threading
 
 class Table(object):
 	"""Represents an html table 
@@ -19,25 +21,31 @@ class Table(object):
 
 	"""
 
-	def __init__(self, topology):
+	def __init__(self, index, queue):
 		"""Sets the topology of the mac domain
 
-		index: describes how many times a 'for' loop needs to run through. 
-		This loop is responsible for creating empty cells.
-
-		Args: topology: Macdomain topology 
-						(ex. 1214 = 1USG (2xbonded), 1 DSG(4xbonded))
+		Args: 
+			index: describes how many times a 'for' loop needs to run through. 
+				This loop is responsible for creating empty cells.
 		"""
-		self.ROOT = os.path.dirname(__file__) #path to root directory
-		if topology == '1214' or topology == '2214':
-			self.index = 2
-		if topology == '1314' or topology == '1324':
-			self.index = 3
+		self.queue = queue
+		self.index = index
 
-		self.result = open(
-			self.ROOT + '/static/result.html', 'w') #Html 
-		self.create_html_header()
-		self.create_table_header(self.index)
+		#print ('Table queue ' + str(self.queue)) #Debug
+		#self.ROOT = os.path.dirname(__file__) #path to root directory
+#		if topology == '1214' or topology == '2214':
+#			self.index = 2
+#		if topology == '1314' or topology == '1324':
+#			self.index = 3
+		
+		self.index = index
+		self.queue = queue
+
+		#self.result = open(
+		#	self.ROOT + '/static/result.html', 'w') #Html 
+		
+		#self.create_html_header()
+		#self.create_table_header(self.index)
 
 	def adjust_4_d3(self, modem):
 		"""No adjustment is needed
@@ -47,7 +55,9 @@ class Table(object):
 		Args:
 			modem: D3 modem
 		"""
-		self.write_tr(modem)
+		#self.write_tr(modem)
+		#print ('Adjusting for D3' + str(modem.__dict__)) #Debug
+		self.queue.put(modem)
 
 	def adjust_4_d2(self, modem):
 		"""Adds empty cells for d2 modems
@@ -80,7 +90,8 @@ class Table(object):
 			modem.docsIfSigQUncorrectables.append(' ')
 			modem.docsIfSigQMicroreflections.append(' ')
 
-		self.write_tr(modem)
+		#self.write_tr(modem)
+		self.queue.put(modem)
 
 	def adjust_4_d1(self, modem):
 		"""Adds empty cells for d1 modems
@@ -92,154 +103,157 @@ class Table(object):
 		Args:
 			modem: D1 modem
 		"""
-		try:
-			self.result.write('<tr>')
-			self.result.write('<td>' + modem.mac + '</td>')
-			self.result.write('<td>' + modem.ip + '</td>')
-			self.result.write('<td>' + modem.iface + '</td>')
-			self.result.write('<td>' + modem.state + '</td>')
-			self.result.write('<td>' + modem.rxpwr + '</td>')
-			self.result.write('<td>' + modem.macversion[0] + '</td>')
-			self.result.write('</tr>')
-		except Exception as e: 
-			"""
-			DEBUG = open(self.ROOT + '/static/debug', 'a') #Debug
-			DEBUG.write(str(datetime.datetime.now()) + ' D1 Error\n')
-			DEBUG.write('mac: ' + modem.mac + '	ip: ' + modem.ip + '\n')
-			DEBUG.write(str(e) + '\n\n')
-			DEBUG.write(str(modem.__dict__) + '\n\n')
-			DEBUG.close()
-			"""
-			
-	def write_tr(self, modem):
-		"""Writes tr containg modem values
+		self.queue.put(modem)
+		#try:
+		#	self.result.write('<tr>')
+		#	self.result.write('<td>' + modem.mac + '</td>')
+		#	self.result.write('<td>' + modem.ip + '</td>')
+		#	self.result.write('<td>' + modem.iface + '</td>')
+		#	self.result.write('<td>' + modem.state + '</td>')
+		#	self.result.write('<td>' + modem.rxpwr + '</td>')
+		#	self.result.write('<td>' + modem.macversion[0] + '</td>')
+		#	self.result.write('</tr>')
+		#except Exception as e: 
+		#	"""
+		#	DEBUG = open(self.ROOT + '/static/debug', 'a') #Debug
+		#	DEBUG.write(str(datetime.datetime.now()) + ' D1 Error\n')
+		#	DEBUG.write('mac: ' + modem.mac + '	ip: ' + modem.ip + '\n')
+		#	DEBUG.write(str(e) + '\n\n')
+		#	DEBUG.write(str(modem.__dict__) + '\n\n')
+		#	DEBUG.close()
+		#	"""
 
-		Args:
-			modem: cable modem
-		"""	
-		self.result.write('<tr>')
-		self.result.write('<td>' + modem.mac + '</td>')
-		self.result.write('<td>' + modem.ip + '</td>')
-		self.result.write('<td>' + modem.iface + '</td>')
-		self.result.write('<td>' + modem.state + '</td>')
-		self.result.write('<td>' + modem.rxpwr + '</td>')
-		#US 
-		for value in modem.macversion:
-			self.result.write('<td>' + value + '</td>')
-		for value in modem.upsnr:
-			self.result.write('<td>' + value + '</td>')
-		for value in modem.receivedpwr:
-			self.result.write('<td>' + value + '</td>')
-		for value in modem.reportedtransmitpwr:
-			self.result.write('<td>' + value + '</td>')
-		for value in modem.dspwr:
-			self.result.write('<td>' + value + '</td>')
-		for value in modem.toff:
-			self.result.write('<td>' + value + '</td>')
-		for value in modem.uncorrectables:
-			self.result.write('<td>' + value + '</td>')
-		for value in modem.flaps:
-			self.result.write('<td>' + value + '</td>')
-		for value in modem.errors:
-			self.result.write('<td>' + value + '</td>')
-		for value in modem.reason:
-			self.result.write('<td>' + value + '</td>')
-		#DS	
-		for value in modem.docsIfDownChannelPower:
-			self.result.write('<td>' + value + '</td>')
-		for value in modem.docsIfSigQSignalNoise:
-			self.result.write('<td>' + value + '</td>')
-		for value in modem.docsIfSigQUncorrectables:
-			self.result.write('<td>' + value + '</td>')
-		for value in modem.docsIfSigQMicroreflections:
-			self.result.write('<td>' + value + '</td>')
-		for value in modem.docsIfCmStatusTxPower:
-			self.result.write('<td>' + value + '</td>')
-		for value in modem.docsIfCmStatusInvalidUcds:
-			self.result.write('<td>' + value + '</td>')
-		for value in modem.docsIfCmStatusT3Timeouts:
-			self.result.write('<td>' + value + '</td>')
-		for value in modem.docsIfCmStatusT4Timeouts:
-			self.result.write('<td>' + value + '</td>')		
-		self.result.write('</tr>')
+#def write_tr(self, modem):
+#	"""Writes tr containg modem values
 
-	def write_th(self, title, loop):
-		"""writes the th into a file
+#	Args:
+#		modem: cable modem
+#	"""	
+#	self.result.write('<tr>')
+#	self.result.write('<td>' + modem.mac + '</td>')
+#	self.result.write('<td>' + modem.ip + '</td>')
+#	self.result.write('<td>' + modem.iface + '</td>')
+#	self.result.write('<td>' + modem.state + '</td>')
+#	self.result.write('<td>' + modem.rxpwr + '</td>')
+#	#US 
+#	for value in modem.macversion:
+#		self.result.write('<td>' + value + '</td>')
+#	for value in modem.upsnr:
+#		self.result.write('<td>' + value + '</td>')
+#	for value in modem.receivedpwr:
+#		self.result.write('<td>' + value + '</td>')
+#	for value in modem.reportedtransmitpwr:
+#		self.result.write('<td>' + value + '</td>')
+#	for value in modem.dspwr:
+#		self.result.write('<td>' + value + '</td>')
+#	for value in modem.toff:
+#		self.result.write('<td>' + value + '</td>')
+#	for value in modem.uncorrectables:
+#		self.result.write('<td>' + value + '</td>')
+#	for value in modem.flaps:
+#		self.result.write('<td>' + value + '</td>')
+#	for value in modem.errors:
+#		self.result.write('<td>' + value + '</td>')
+#	for value in modem.reason:
+#		self.result.write('<td>' + value + '</td>')
+#	#DS	
+#	for value in modem.docsIfDownChannelPower:
+#		self.result.write('<td>' + value + '</td>')
+#	for value in modem.docsIfSigQSignalNoise:
+#		self.result.write('<td>' + value + '</td>')
+#	for value in modem.docsIfSigQUncorrectables:
+#		self.result.write('<td>' + value + '</td>')
+#	for value in modem.docsIfSigQMicroreflections:
+#		self.result.write('<td>' + value + '</td>')
+#	for value in modem.docsIfCmStatusTxPower:
+#		self.result.write('<td>' + value + '</td>')
+#	for value in modem.docsIfCmStatusInvalidUcds:
+#		self.result.write('<td>' + value + '</td>')
+#	for value in modem.docsIfCmStatusT3Timeouts:
+#		self.result.write('<td>' + value + '</td>')
+#	for value in modem.docsIfCmStatusT4Timeouts:
+#		self.result.write('<td>' + value + '</td>')		
+#	self.result.write('</tr>')
 
-		Depending on topology and called from create_table_header().
-		"""
-		for i in range(loop):
-			self.result.write('<th>' + title + '</th>')
-		
-	def create_html_header(self):
-		"""Writes HTML Header
-		
-			The header contains some javascript to include tablesort 2.0
-			http://tablesorter.com
-		"""
-		self.result.write('<!DOCTYPE HTML>')
-		self.result.write('<html>')
-		self.result.write('<head>')	
-		self.result.write(
-			'<link rel="stylesheet" href="/static/themes/blue/style.css" />')
-		self.result.write(
-			'<script type="text/javascript"' 
-			' src="http://code.jquery.com/jquery-1.8.3.min.js"></script>')
-		self.result.write(
-			'<script type="text/javascript"'
-			' src="/static/jquery.tablesorter.min.js"></script>')
-		self.result.write('<script type="text/javascript">')
-		self.result.write('jQuery(document).ready(function()')
-		self.result.write('{') 
-		self.result.write('jQuery("#resultTable").tablesorter({')
-		self.result.write('widthFixed: true,')
-		self.result.write("widgets: ['zebra']")
-		self.result.write('}')
-		self.result.write(');') 
-		self.result.write('}') 
-		self.result.write(');') 
-		self.result.write('</script>')	
-		self.result.write('</head>')
-		self.result.write('<body>')
+#	def write_th(self, title, loop):
+#		"""writes the th into a file
+#
+#		Depending on topology and called from create_table_header().
+#		"""
+#		for i in range(loop):
+#			self.result.write('<th>' + title + '</th>')
+	
 
-	def create_table_header(self, index):
-		"""Writes HTML table header"""
-		self.result.write('<table id="resultTable" class="tablesorter">')
-		self.result.write('<thead>')
-		self.result.write('<tr>')
-		#US (index depends on the topology)
-		self.write_th('mac',1)
-		self.write_th('ip',1)
-		self.write_th('iface',1)
-		self.write_th('state',1)
-		self.write_th('rxpwr',1) 
-		self.write_th('Docsis',1)
-		self.write_th('upsnr',index)
-		self.write_th('receivedpwr',index)
-		self.write_th('reportedtransmitpwr',index)
-		self.write_th('dspwr',1)
-		self.write_th('toff',index)
-		self.write_th('init toff',index)
-		self.write_th('uncorrectables',index)
-		self.write_th('flaps',1)
-		self.write_th('errors',1)
-		self.write_th('reason',1)
-		#DS
-		self.write_th('docsIfDownChannelPower',4)
-		self.write_th('docsIfSigQSignalNoise<',4)
-		self.write_th('docsIfSigQUncorrectables',4)
-		self.write_th('docsIfSigQMicroreflections',4)
-		self.write_th('docsIfCmStatusTxPower',1)
-		self.write_th('docsIfCmStatusInvalidUcds',1)
-		self.write_th('docsIfCmStatusT3Timeouts',1)
-		self.write_th('docsIfCmStatusT4Timeouts',1)
+#	def create_html_header(self):
+#		"""Writes HTML Header
+#		
+#			The header contains some javascript to include tablesort 2.0
+#			http://tablesorter.com
+#		"""
+#		self.result.write('<!DOCTYPE HTML>')
+#		self.result.write('<html>')
+#		self.result.write('<head>')	
+#		self.result.write(
+#			'<link rel="stylesheet" href="/static/themes/blue/style.css" />')
+#		self.result.write(
+#			'<script type="text/javascript"' 
+#			' src="http://code.jquery.com/jquery-1.8.3.min.js"></script>')
+#		self.result.write(
+#			'<script type="text/javascript"'
+#			' src="/static/jquery.tablesorter.min.js"></script>')
+#		self.result.write('<script type="text/javascript">')
+#		self.result.write('jQuery(document).ready(function()')
+#		self.result.write('{') 
+#		self.result.write('jQuery("#resultTable").tablesorter({')
+#		self.result.write('widthFixed: true,')
+#		self.result.write("widgets: ['zebra']")
+#		self.result.write('}')
+#		self.result.write(');') 
+#		self.result.write('}') 
+#		self.result.write(');') 
+#		self.result.write('</script>')	
+#		self.result.write('</head>')
+#		self.result.write('<body>')
+#
+#	def create_table_header(self, index):
+#		"""Writes HTML table header"""
+#		self.result.write('<table id="resultTable" class="tablesorter">')
+#		self.result.write('<thead>')
+#		self.result.write('<tr>')
+#		#US (index depends on the topology)
+#		self.write_th('mac',1)
+#		self.write_th('ip',1)
+#		self.write_th('iface',1)
+#		self.write_th('state',1)
+#		self.write_th('rxpwr',1) 
+#		self.write_th('Docsis',1)
+#		self.write_th('upsnr',index)
+#		self.write_th('receivedpwr',index)
+#		self.write_th('reportedtransmitpwr',index)
+#		self.write_th('dspwr',1)
+#		self.write_th('toff',index)
+#		self.write_th('init toff',index)
+#		self.write_th('uncorrectables',index)
+#		self.write_th('flaps',1)
+#		self.write_th('errors',1)
+#		self.write_th('reason',1)
+#		#DS
+#		self.write_th('docsIfDownChannelPower',4)
+#		self.write_th('docsIfSigQSignalNoise<',4)
+#		self.write_th('docsIfSigQUncorrectables',4)
+#		self.write_th('docsIfSigQMicroreflections',4)
+#		self.write_th('docsIfCmStatusTxPower',1)
+#		self.write_th('docsIfCmStatusInvalidUcds',1)
+#		self.write_th('docsIfCmStatusT3Timeouts',1)
+#		self.write_th('docsIfCmStatusT4Timeouts',1)
+#
+#		self.result.write('</tr>')
+#		self.result.write('</thead>')
+#		self.result.write('<tbody>')
+	
 
-		self.result.write('</tr>')
-		self.result.write('</thead>')
-		self.result.write('<tbody>')
-
-	def create_html_footer(self):
-		"""Writes HTML footer"""	
-		self.result.write('</table>')
-		self.result.write('</body>')
-		self.result.write('</html>')
+#	def create_html_footer(self):
+#		"""Writes HTML footer"""	
+#		self.result.write('</table>')
+#		self.result.write('</body>')
+#		self.result.write('</html>')

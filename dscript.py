@@ -9,6 +9,7 @@
 """
 #My modules
 from table import Table
+from control import Control
 
 #Other modules
 import re
@@ -16,9 +17,10 @@ import sys
 import time 
 import datetime      
 import telnetlib
-import json
+#import json
 import threading
 import os
+import Queue
 from pysnmp.entity.rfc3413.oneliner import cmdgen
 
 
@@ -31,6 +33,9 @@ class Cmts(object):
 	used to access the cmts and run commands. The session stays open until the 
 	object is destroyed.
 	"""
+
+	lock1 = threading.Lock()
+	lock2 = threading.Lock()
 	
 	def __init__(self, ip, name):
 		"""Inits cmts with ip, name and 2 telnet object.
@@ -51,7 +56,7 @@ class Cmts(object):
 		self.tn1 = TelnetAccess(self.ip, self.name, IOS_UID, IOS_PW)
 		self.tn2 = TelnetAccess(self.ip, self.name, IOS_UID, IOS_PW) 
     
-	def createMacDomain(self, iface, topology):
+	def createMacDomain(self, iface, topology, queue):
 		"""Creates and stores the mac domain.
 		
 		See MacDomain class.
@@ -59,14 +64,15 @@ class Cmts(object):
 		Args:
 			iface: the macdomain selected by the user
 		"""
-		self.macdomains  = MacDomain(iface, topology)
+		self.macdomains  = MacDomain(iface, topology, queue)
 
 	def getCMs(self):
 		"""Retrieves all modems in the specified macdomain
 		
 		By running the ios command "show cable modem cable [macdomain]"
 		"""
-		return self.tn1.runCommand('show cable modem cable ' + str(self.macdomains.name))
+		return self.tn1.runCommand('show cable modem cable ' + 
+			str(self.macdomains.name))
 
 	def getCMverbose(self, cmmac, thread_id):
 		"""Retroves values for a specific cable modem.
@@ -79,10 +85,13 @@ class Cmts(object):
 			thread_id: used to alternate between telnet streams
 		"""
 		if thread_id % 2 == 0:
+			#Cmts.lock1.acquire()
 			return self.tn1.runCommand('show cable modem ' + cmmac + ' verbose')
+			#Cmts.lock1.release()
 		else:
+			#Cmts.lock2.acquire()
 			return self.tn2.runCommand('show cable modem ' + cmmac + ' verbose')
-			
+			#Cmts.lock2.release()
 
 	def __del__(self):
 		"""Closes and deletes the telnet connection"""
@@ -99,16 +108,27 @@ class MacDomain(object):
 	the cmts output. 
 	"""
 		
-	def __init__(self, name, topology):
+	def __init__(self, name, topology, queue):
 		"""Inits the macdomain
+
+		index is used to describe how many times a loop is run for.
+		this attribute is used by the table and control class
 		
 		Args:
 			name: represents the mac domain (ex. c5/1/0)
-			topology: HFC topology
+			topology: Macdomain topology 
+				(ex. 1214 = 1USG (2xbonded), 1 DSG(4xbonded))
 		"""
 		self.name = name
 		self.topology = topology
-		self.table = Table(topology) 
+		self.queue = queue
+
+		if topology == '1214' or topology == '2214':
+			self.index = 2
+		if topology == '1314' or topology == '1324':
+			self.index = 3
+		
+		self.table = Table(self.index, queue) 
 
 	def extractData(self, get_cm_output):
 		"""Extracts and filters modem values.
@@ -139,8 +159,13 @@ class MacDomain(object):
 		del cleanedlist[0:4]
 		del cleanedlist[len(cleanedlist)-1]
 		del cleanedlist[len(cleanedlist)-1]
-		global CM_TOTAL
-		CM_TOTAL = len(cleanedlist)
+
+		#TODO, should be a class or instance variable, if possible
+		#This global is also used by the control class, find a better
+		#solution
+		global control 
+		control.cm_total = len(cleanedlist)
+		
 		#fin.close()
 		
 		#Step 2.2: Modem object (thread) is created with initial values.
@@ -150,12 +175,15 @@ class MacDomain(object):
 		for line in cleanedlist:
 			modem = Modem(line, thread_id) #NEW: add line to Modem
 			all_threads += [modem]
-			modem.start()
 			thread_id += 1
+			modem.start()		
 		for thread in all_threads:
 			thread.join()
+		global exit_marker
+		print ('Putting Exit' + str(exit_marker))
+		self.queue.put(exit_marker)
 			
-			"""
+		"""
 			#NEW: All will be added to CM - can be initiated in init. 
 
 			del cmdatafromcmts[:]
@@ -214,7 +242,7 @@ class Modem(threading.Thread):
 	snmpcommunity = 'web4suhr'
 	lock1 = threading.Lock()
 	lock2 = threading.Lock()
-	lock3 = threading.Lock()
+	#lock3 = threading.Lock()
 
 	def __init__(self, line, thread_id):
 		"""Inits modem setting all attributes to empty values
@@ -268,14 +296,13 @@ class Modem(threading.Thread):
 		#TODO: find a better way, duplicated code, especially as the same
 		#	the same condition is found in the cmts class again!
 
+		
 		if self.thread_id % 2 == 0:
 			Modem.lock1.acquire()
 			
-			"""
-			DEBUG.write('Thread Id: ' + str(self.thread_id) + 
-					'    CMVerbose Timestamp: ' + str(datetime.datetime.now()) + 
-					'	 State: ' + self.state + '\n')
-			"""
+			#DEBUG.write('Thread Id: ' + str(self.thread_id) + 
+			#		'    CMVerbose Timestamp: ' + str(datetime.datetime.now()) + 
+			#		'	 State: ' + self.state + '\n')
 
 			verbose_output = ubr01shr.getCMverbose(values[0], self.thread_id)
 			self.setUSData(verbose_output)
@@ -283,45 +310,55 @@ class Modem(threading.Thread):
 		else: 
 			Modem.lock2.acquire()
 			
-			"""
-			DEBUG.write('Thread Id: ' + str(self.thread_id) + 
-					'    CMVerbose Timestamp: ' + str(datetime.datetime.now()) + 
-					'	 State: ' + self.state + '\n')
-			"""
+			#DEBUG.write('Thread Id: ' + str(self.thread_id) + 
+			#		'    CMVerbose Timestamp: ' + str(datetime.datetime.now()) + 
+			#		'	 State: ' + self.state + '\n')
 
 			verbose_output = ubr01shr.getCMverbose(values[0], self.thread_id)
 			self.setUSData(verbose_output)
 			Modem.lock2.release()
+		
+
+		#verbose_output = ubr01shr.getCMverbose(values[0], self.thread_id) #Debug
+		#self.setUSData(verbose_output) #Debug
+
+		#print (self.macversion[0] + '\n') #Debug
 
 		#Step 2.4: 	Setting DS data retrieved from the modem 
 		# 			except (D1 Modems), no Lock.l
 		if 'DOC3.0' in self.macversion or 'DOC2.0' in self.macversion:
-			self.setDSData()
+			self.setDSData() #Debug
 
 		#Step 2.5: Writting html ouptut
-		Modem.lock3.acquire()
+		#Modem.lock3.acquire()
 
 		"""
 		DEBUG.write('Thread Id: ' + str(self.thread_id) + 
 			'    HTML Output Timestamp: ' + str(datetime.datetime.now()) + 
 			' 	 MAC: ' + self.mac + '\n') 
 		"""
-
+		global control #Debug
+		print ('Alive? ' + str(control.is_alive()))#Debug
 		if 'DOC3.0' in self.macversion:
-			ubr01shr.macdomains.table.adjust_4_d3(self)
+			print ('if D3: ' + str(self.thread_id) + '\n') #Debug
+			ubr01shr.macdomains.table.adjust_4_d3(self) #Debug
+
 
 		elif 'DOC2.0' in self.macversion:
-			ubr01shr.macdomains.table.adjust_4_d2(self)
+			print ('if D2 '+ str(self.thread_id) + '\n') #Debug
+			ubr01shr.macdomains.table.adjust_4_d2(self) #Debug
 
 		else:
-			ubr01shr.macdomains.table.adjust_4_d1(self)
+			print ('if D1 ' + str(self.thread_id) + '\n') #Debug
+			ubr01shr.macdomains.table.adjust_4_d1(self) #Debug
+
 		
 		
-		global CM_COUNT
-		CM_COUNT+=1
-		writeState();
+		#global CM_COUNT #TODO
+		#CM_COUNT+=1
+		#writeState();
 		
-		Modem.lock3.release()	
+		#Modem.lock3.release()	
 
 	def setUSData(self, verbose_output):
 		"""Sets US Data"""
@@ -500,46 +537,52 @@ class TelnetAccess(object):
 		"""Close connection"""
 		self.tn.close()
 		
-def writeState(): 
-	"""Writes stats into file
-	
-	These stats serve as a modem counter and includes the running state  of the
-	script.
-	"""
-	data = {'CM_TOTAL' : CM_TOTAL, 'CM_COUNT': CM_COUNT, 
-			'CM_ONLINE' : CM_ONLINE, 'RUN_STATE' : RUN_STATE}
-	STATUS.seek(0)
-	STATUS.write(json.dumps(data))
-
 #TODO: Add following to main() 
 
 ROOT = os.path.dirname(__file__)	#setting root path to directory of file
-RUN_STATE = 1	#states if the script is running (0=no, 1=yes)
-CM_TOTAL = ''	#holds all CM in macdomain
-CM_COUNT = 0	#holds number of processed modems
-CM_ONLINE = 0	#this counter counts only online modems
+#RUN_STATE = 1	#states if the script is running (0=no, 1=yes)
+#CM_TOTAL = ''	#holds all CM in macdomain
+#CM_COUNT = 0	#holds number of processed modems
+#CM_ONLINE = 0	#this counter counts only online modems
 IOS_UID = 'dscript'
 IOS_PW = 'hf4ev671'
-STATUS = open(ROOT + '/static/status', 'w') #Stats
-DEBUG = open(ROOT + '/static/debug', 'w')
+#STATUS = open(ROOT + '/static/status', 'w') #Stats
+#DEBUG = open(ROOT + '/static/debug', 'w')
 
-#Step 1.1 - Receiving argv(mac domain), create cmts, macdomain etc...
+#Step 1.1 - Receiving argv(mac domain), create cmts, macdomain, control etc...
+
 macdomain = str(sys.argv[1])
 topology = str(sys.argv[2])
+queue = Queue.Queue()
+exit_marker = object()
+
+#To run script from command line
+#macdomain = '5/1/0' #Debug
+#topology = '1214' #Debug
 
 ubr01shr = Cmts('10.10.10.50', 'ubr01SHR') #Case Sensitiv, used for telnet prompt
-ubr01shr.createMacDomain(macdomain, topology)
+ubr01shr.createMacDomain(macdomain, topology, queue)
+
+control = Control(queue, exit_marker) # contains all write and status procedures
+control.start()
+control.create_html_header()
+control.create_table_header(ubr01shr.macdomains.index)
+
 get_cm_output = ubr01shr.getCMs()
 
 #Step 2.1 - 2.5: Retrieve, filter data
-ubr01shr.macdomains.extractData(get_cm_output)	 
+ubr01shr.macdomains.extractData(get_cm_output)	
+#queue.put(exit_marker) 
 
 #Step 3 - Cleaning up
-ubr01shr.macdomains.table.create_html_footer()
-ubr01shr.macdomains.table.result.close()
-RUN_STATE=0
-writeState()
-STATUS.close()
-del ubr01shr.macdomains.table
-del ubr01shr
+control.join()
+control.create_html_footer()
+#ubr01shr.macdomains.table.result.close()
+#RUN_STATE=0
+control.run_state = 0
+control.writeState(control.cm_total, control.cm_count, control.cm_online,
+	control.run_state)
+#STATUS.close()
+#del ubr01shr
+del control
 
