@@ -1,9 +1,23 @@
+"""
+	Version:	Dev. 0.1 - Resource control class 
+	Author:		Memleak13
+	Modified:	18.07.13
+
+	This module is used to control access to files. It uses a queue to retrieve 
+	the modems and builds the final html page which is then fetched by ajax
+"""
 import os
 import json
 import threading
 import Queue
 
 class Control (threading.Thread):
+	"""Builds the final html page
+
+	It is responsible to control access to any files.
+	It receives all modems from a queue and it also contains all running
+	state vars.
+	"""
 	def __init__(self, queue, exit_marker):
 		threading.Thread.__init__(self)
 		self.queue = queue
@@ -16,11 +30,7 @@ class Control (threading.Thread):
 		self.run_state = 1	#states if the script is running (0=no, 1=yes)
 		self.cm_total = ''	#holds all CM in macdomain
 		self.cm_count = 0	#holds number of processed modems
-		self.cm_online = 0	#this counter counts only online modems	
-
-		self.debug.write('1. Control - Init')
-		print ('Control queue ' + str(queue))
-		
+		self.cm_online = 0	#this counter counts only online modems			
 
 	def run(self):
 		"""Writes tr containg modem values
@@ -28,20 +38,10 @@ class Control (threading.Thread):
 		Args:
 			modem: cable modem
 		"""
-
-		self.debug.write('2. Control - Run')
-		
 		while True:
 			modem = self.queue.get()
 			if modem is self.exit:
-				#self.debug.write('Marker: ' + str(modem))
 				break
-			#print ('Get Modem: ' + str(modem) + '\n')
-			#self.debug.write(modem)
-			self.debug.write(str(modem.thread_id) + '\n')
-			#self.queue.task_done() #debug
-
-
 			self.result.write('<tr>')
 			self.result.write('<td>' + modem.mac + '</td>')
 			self.result.write('<td>' + modem.ip + '</td>')
@@ -87,10 +87,8 @@ class Control (threading.Thread):
 			for value in modem.docsIfCmStatusT4Timeouts:
 				self.result.write('<td>' + value + '</td>')		
 			self.result.write('</tr>')
-
+			
 			self.cm_count += 1
-			#TODO, find a better way for this GLOBAL
-			#This value is set by the macdomain.
 			self.writeState(self.cm_total, self.cm_count, self.cm_online,
 				self.run_state)
 			self.queue.task_done()
@@ -99,8 +97,8 @@ class Control (threading.Thread):
 	def writeState(self, cm_total, cm_count, cm_online, run_state): 
 		"""Writes stats into file
 		
-		These stats serve as a modem counter and includes the running state  of the
-		script.
+		These stats serve as a modem counter and includes the running state  
+		of the script.
 		"""
 		data = {'CM_TOTAL' : cm_total, 'CM_COUNT': cm_count, 
 				'CM_ONLINE' : cm_online, 'RUN_STATE' : run_state}
