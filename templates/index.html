@@ -88,8 +88,9 @@ $def with ()
 								if (response.RUN_STATE == 0) {
 									jQuery("#status").timer('stop');
 									jQuery("#result").load("/static/result.html");
-									jQuery("button").removeAttr('disabled');
-									jQuery("select").removeAttr('disabled');
+									//Todo: Enabling the button works however when pressing it nothing is triggered
+									//jQuery("button").removeAttr('disabled');
+									//jQuery("select").removeAttr('disabled');
 								}
 							});
 						}	
@@ -148,8 +149,10 @@ $def with ()
 						-->
 						<option value="5/0/0|2214">C5/0/0 - Reinach 1,2    </option>     
 						<option value="5/0/1|2214">C5/0/1 - Reinach 3,4    </option>     
-						<option value="5/0/2|2214">C5/0/2 - Schöftland 1,2 </option>     
-						<option value="5/0/3|2214">C5/0/3 - Schöftland 3,4 </option>        
+						<option value="5/0/6|1314">C5/0/6 - Schöftland 1   </option>
+						<option value="5/0/7|1314">C5/0/7 - Schöftland 2   </option> 
+						<option value="5/0/8|1314">C5/0/8 - Schöftland 3   </option>      
+						<option value="5/0/9|1314">C5/0/9 - Schöftland 4   </option>        
 						<option value="5/0/4|2214">C5/0/4 - Zetzwil,Gonten.</option>           
 						<option value="5/1/0|1214">C5/1/0 - Suhr 1, TBS    </option>            
 						<option value="5/1/1|1214">C5/1/1 - Suhr 2, Bärenm.</option>            
@@ -173,7 +176,7 @@ $def with ()
 				<td colspan="2"><div id="status"><a href="/static/result.html">Letzte Abfrage</div></td>
 			</tr>
 		</table>
-		<div id="impressum"> Developed by Teletrend AG for Technische Betriebe Suhr - Version 0.1 Beta(05.2013)</div>
+		<div id="impressum"> Developed by Teletrend AG for Technische Betriebe Suhr - Version RC.0.0.1 - 07.2013</div>
 		<div id="result"></div>
 	</body>
 </html>
