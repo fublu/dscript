@@ -2,7 +2,7 @@
 """
 	Version:	Dev. 0.1 - Threading and URL corrections 
 	Author:		Memleak13
-	Date:		11.07.13
+	Modified:	18.07.13
 
 	This is the main script which requests the data from the cmts and modems.
 	It is started from main.py and calls table.py to create the html file.

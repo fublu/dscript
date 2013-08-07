@@ -1,7 +1,7 @@
 """
 	Version:	Dev. 0.1 - Threading and URL corrections 
 	Author:		Memleak13
-	Date:		11.07.13
+	Modified:	18.07.13
 
 	This module adjusts the modem values to be inserted into the html table
 """
